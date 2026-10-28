@@ -1,0 +1,35 @@
+{
+  "name": "sire",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "server": "node server/index.mjs",
+    "generate:pdfs": "node --experimental-strip-types scripts/generate-invoice-pdfs.mjs",
+    "db:create-tables": "node scripts/create-tables.mjs",
+    "test": "node --experimental-strip-types --test tests/invoice-pdf.test.mjs tests/review.test.mjs tests/manual-upload.test.mjs tests/currency.test.mjs tests/suppliers.test.mjs tests/projects.test.mjs tests/validation.test.mjs tests/db-config.test.mjs tests/live-data.test.mjs",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.469.0",
+    "oracledb": "^26.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.6.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.3"
+  }
+}

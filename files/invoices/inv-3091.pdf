@@ -1,0 +1,65 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Length 737 >>
+stream
+BT
+/F1 10 Tf
+15 TL
+48 792 Td
+(Cedar Formwork Co) Tj
+T*
+(SUPPLIER INVOICE \(synthetic sample document\)) Tj
+T*
+(Invoice number: INV-3091) Tj
+T*
+(Invoice date: 2026-10-20) Tj
+T*
+(Received date: 2026-10-24) Tj
+T*
+(Project: Airport Link Road \(PRJ-318\)) Tj
+T*
+(Job number: JOB-9021) Tj
+T*
+(Bill To: SIRE Projects, Airport Link Compound) Tj
+T*
+(Remittance address: Cedar Formwork Co, Unit 7 Timber Park, Bristol) Tj
+T*
+(Lines:) Tj
+T*
+(1. Formwork panels - 140 ea x GBP 68.00 = GBP 9,520.00) Tj
+T*
+(2. Props and braces hire - 4 weeks x GBP 805.00 = GBP 3,220.00) Tj
+T*
+(Amount due: GBP 12,740.00) Tj
+T*
+(Synthetic document generated for SIRE UI verification.) Tj
+T*
+(It is the source document for the matching synthetic invoice record.) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000185 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1099
+%%EOF

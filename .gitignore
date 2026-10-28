@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.npm-cache/
+*.local
+*.tsbuildinfo
+
+# Local secrets — never commit
+credentials.json
+token.json
+.env
+.env.*
+wallet/

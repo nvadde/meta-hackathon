@@ -1,0 +1,65 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Length 742 >>
+stream
+BT
+/F1 10 Tf
+15 TL
+48 792 Td
+(Harbor Plant Hire) Tj
+T*
+(SUPPLIER INVOICE \(synthetic sample document\)) Tj
+T*
+(Invoice number: INV-4411) Tj
+T*
+(Invoice date: 2026-10-19) Tj
+T*
+(Received date: 2026-10-22) Tj
+T*
+(Project: Metro Station Fit-Out \(PRJ-422\)) Tj
+T*
+(Job number: JOB-3311) Tj
+T*
+(Bill To: SIRE Projects, Metro Station Office) Tj
+T*
+(Remittance address: Harbor Plant Hire, 3 Dockside Ave, Seattle, WA) Tj
+T*
+(Lines:) Tj
+T*
+(1. Tower crane hire - 1 month x USD 18,500.00 = USD 18,500.00) Tj
+T*
+(2. Operator overtime - 30 hrs x USD 121.67 = USD 3,650.00) Tj
+T*
+(Amount due: USD 22,150.00) Tj
+T*
+(Synthetic document generated for SIRE UI verification.) Tj
+T*
+(It is the source document for the matching synthetic invoice record.) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000185 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1104
+%%EOF
