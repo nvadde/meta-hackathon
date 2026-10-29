@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Database, Loader2, RefreshCw, XCircle } from "lucide-react";
+import { CheckCircle2, Database, Loader2, Mail, MessageCircle, RefreshCw, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,13 +22,31 @@ type LoadState =
   | { kind: "ready"; data: DbStatus }
   | { kind: "unavailable" };
 
+interface SourceStatus {
+  connected: boolean;
+  emailAddress?: string;
+  messagesTotal?: number;
+  status?: string;
+  detail?: string;
+  error?: string;
+}
+
+type SourceLoadState =
+  | { kind: "loading" }
+  | { kind: "ready"; data: SourceStatus }
+  | { kind: "unavailable" };
+
 export function Connections() {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const [gmail, setGmail] = useState<SourceLoadState>({ kind: "loading" });
+  const [whatsapp, setWhatsapp] = useState<SourceLoadState>({ kind: "loading" });
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setState({ kind: "loading" });
+    setGmail({ kind: "loading" });
+    setWhatsapp({ kind: "loading" });
     fetch("/api/db/status")
       .then((response) => {
         if (!response.ok) throw new Error("bad response");
@@ -39,6 +57,28 @@ export function Connections() {
       })
       .catch(() => {
         if (!cancelled) setState({ kind: "unavailable" });
+      });
+    fetch("/api/sources/gmail")
+      .then((response) => {
+        if (!response.ok) throw new Error("bad response");
+        return response.json() as Promise<SourceStatus>;
+      })
+      .then((data) => {
+        if (!cancelled) setGmail({ kind: "ready", data });
+      })
+      .catch(() => {
+        if (!cancelled) setGmail({ kind: "unavailable" });
+      });
+    fetch("/api/sources/whatsapp")
+      .then((response) => {
+        if (!response.ok) throw new Error("bad response");
+        return response.json() as Promise<SourceStatus>;
+      })
+      .then((data) => {
+        if (!cancelled) setWhatsapp({ kind: "ready", data });
+      })
+      .catch(() => {
+        if (!cancelled) setWhatsapp({ kind: "unavailable" });
       });
     return () => {
       cancelled = true;
@@ -127,14 +167,103 @@ export function Connections() {
                 </ul>
               </div>
             )}
-            {state.data.note && <p className="mt-4 text-muted-foreground">{state.data.note}</p>}
+            {state.data.note &&
+              state.data.note !== "Connected to Oracle and all SIRE tables from Tables.sql are present." && (
+                <p className="mt-4 text-muted-foreground">{state.data.note}</p>
+              )}
           </div>
         )}
       </div>
 
+      <div className="mt-4 rounded-lg border bg-card p-5 text-card-foreground">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Mail aria-hidden="true" className="h-5 w-5 text-teal-dark dark:text-teal" />
+          <h3 className="font-semibold">Gmail (read-only)</h3>
+          {gmail.kind === "loading" && (
+            <Badge variant="secondary" className="ml-auto gap-1">
+              <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" /> Checking
+            </Badge>
+          )}
+          {gmail.kind === "ready" && gmail.data.connected && (
+            <Badge className="ml-auto gap-1 bg-teal text-white hover:bg-teal">
+              <CheckCircle2 aria-hidden="true" className="h-3 w-3" /> Connected
+            </Badge>
+          )}
+          {(gmail.kind === "unavailable" || (gmail.kind === "ready" && !gmail.data.connected)) && (
+            <Badge variant="secondary" className="ml-auto gap-1">
+              <XCircle aria-hidden="true" className="h-3 w-3" /> Not connected
+            </Badge>
+          )}
+        </div>
+        {gmail.kind === "loading" && (
+          <p className="text-sm text-muted-foreground">Checking Gmail connection…</p>
+        )}
+        {gmail.kind === "unavailable" && (
+          <p className="text-sm text-muted-foreground">
+            The backend is not running, so the Gmail connection cannot be checked.
+          </p>
+        )}
+        {gmail.kind === "ready" && gmail.data.connected && (
+          <p className="text-sm text-muted-foreground">
+            {gmail.data.emailAddress}
+            {typeof gmail.data.messagesTotal === "number" && (
+              <> · {gmail.data.messagesTotal.toLocaleString()} messages total</>
+            )}
+          </p>
+        )}
+        {gmail.kind === "ready" && !gmail.data.connected && (
+          <p className="text-sm text-muted-foreground">
+            Gmail is not connected{gmail.data.error ? `: ${gmail.data.error}` : "."}
+          </p>
+        )}
+      </div>
+
+      <div className="mt-4 rounded-lg border bg-card p-5 text-card-foreground">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <MessageCircle aria-hidden="true" className="h-5 w-5 text-teal-dark dark:text-teal" />
+          <h3 className="font-semibold">WhatsApp</h3>
+          {whatsapp.kind === "loading" && (
+            <Badge variant="secondary" className="ml-auto gap-1">
+              <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" /> Checking
+            </Badge>
+          )}
+          {whatsapp.kind === "ready" && whatsapp.data.connected && (
+            <Badge className="ml-auto gap-1 bg-teal text-white hover:bg-teal">
+              <CheckCircle2 aria-hidden="true" className="h-3 w-3" /> Connected
+            </Badge>
+          )}
+          {(whatsapp.kind === "unavailable" ||
+            (whatsapp.kind === "ready" && !whatsapp.data.connected)) && (
+            <Badge variant="secondary" className="ml-auto gap-1">
+              <XCircle aria-hidden="true" className="h-3 w-3" /> Not connected
+            </Badge>
+          )}
+        </div>
+        {whatsapp.kind === "loading" && (
+          <p className="text-sm text-muted-foreground">Checking WhatsApp connection…</p>
+        )}
+        {whatsapp.kind === "unavailable" && (
+          <p className="text-sm text-muted-foreground">
+            The backend is not running, so the WhatsApp connection cannot be checked.
+          </p>
+        )}
+        {whatsapp.kind === "ready" && !whatsapp.data.connected && (
+          <p className="text-sm text-muted-foreground">
+            {whatsapp.data.detail ||
+              (whatsapp.data.error
+                ? `WhatsApp is not connected: ${whatsapp.data.error}`
+                : "WhatsApp needs a WhatsApp Business or Twilio account.")}
+          </p>
+        )}
+        {whatsapp.kind === "ready" && whatsapp.data.connected && (
+          <p className="text-sm text-muted-foreground">
+            {whatsapp.data.detail || "WhatsApp is connected."}
+          </p>
+        )}
+      </div>
+
       <p className="mt-4 text-sm text-muted-foreground">
-        Gmail (read-only) is shown on the Invoice Workbench. WhatsApp still needs a WhatsApp Business
-        or Twilio account. ERP posting is not connected; approved invoices only queue locally.
+        ERP posting is not connected; approved invoices only queue locally.
       </p>
     </section>
   );

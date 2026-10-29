@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { InvoiceDetail } from "@/components/InvoiceDetail";
 import { InvoiceWorkbench } from "@/components/InvoiceWorkbench";
 import { MyActions } from "@/components/MyActions";
+import { Overview } from "@/components/Overview";
 import { Connections } from "@/components/Connections";
 import { Notifications } from "@/components/Notifications";
 import { Projects } from "@/components/Projects";
@@ -524,6 +525,8 @@ export default function App() {
               onApprove={approveInvoice}
               onReject={rejectInvoice}
             />
+          ) : activeSection.id === "overview" ? (
+            <Overview />
           ) : activeSection.id === "workbench" ? (
             <InvoiceWorkbench
               invoices={activeInvoices}

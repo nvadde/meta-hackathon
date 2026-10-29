@@ -69,7 +69,10 @@ INSERT INTO code_lov (lov_id, lov_type, code, display_name, sort_order)
 VALUES (16, 'PROCESSING_STATUS', 'Approved', 'Approved', 6);
 INSERT INTO code_lov (lov_id, lov_type, code, display_name, sort_order)
 VALUES (17, 'PROCESSING_STATUS', 'Rejected', 'Rejected', 7);
-
+INSERT INTO code_lov (lov_id, lov_type, code, display_name, sort_order)
+VALUES (18, 'PROCESSING_STATUS', 'Success', 'Invoice created', 8);
+INSERT INTO code_lov (lov_id, lov_type, code, display_name, sort_order)
+VALUES (19, 'PROCESSING_STATUS', 'Failed', 'Failed to create Invoice', 9);
 
 -- -----------------------------------------------------------------------------
 -- ERP feed: suppliers (Suppliers screen)
