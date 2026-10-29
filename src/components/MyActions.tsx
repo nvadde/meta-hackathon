@@ -76,18 +76,14 @@ export function MyActions({
         )}
       </div>
       <h2 className="mb-2 text-[28px] font-semibold leading-tight">Invoice review workbench</h2>
-      <p className="mb-4 max-w-[75ch] text-muted-foreground">
-        Exception invoices to inspect and correct, invoices you have edited, and invoices you have
-        approved. Open any row to check its header, lines, and source PDF, then use Edit and Save to
-        correct it. Every saved change is listed under My changes below.
-      </p>
 
-      <div className="mb-6 flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
+      <div className="mb-4 flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
         <PlugZap aria-hidden="true" className="mt-0.5 h-5 w-5 shrink-0" />
         <p className="text-sm">
-          <strong>ERP integration is not connected.</strong> Approved invoices are marked “Approved —
-          awaiting ERP” and would be picked up for ERP invoice creation once that integration exists.
-          Nothing is sent to an ERP from this screen, and edits are stored only in this browser.
+          <strong>ERP integration is not connected.</strong> Approved invoices are queued
+          in <code className="rounded bg-muted px-1 py-0.5 text-xs">erp_invoice_queue</code> for
+          ERP invoice creation once that integration exists. Nothing is sent to an ERP from this
+          screen{dataMode === "live" ? "; decisions are written to the Oracle tables" : ", and sample edits are stored only in this browser"}.
         </p>
       </div>
 
@@ -118,6 +114,7 @@ export function MyActions({
         actionKinds={actionKinds}
         supplierFeed={supplierFeed}
         projectFeed={projectFeed}
+        liveSources={dataMode === "live"}
         emptyTitle="No actions outstanding"
         emptyText="No invoices need review, none have been edited, and none are approved yet. Exception invoices will appear here automatically."
       />

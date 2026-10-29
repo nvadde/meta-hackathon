@@ -51,10 +51,7 @@ export function Connections() {
         Connections
       </p>
       <h2 className="mb-2 text-[28px] font-semibold leading-tight">Connections</h2>
-      <p className="mb-6 max-w-[65ch] text-muted-foreground">
-        External connections used by SIRE. Credentials stay on the local backend and are never shown
-        here or sent to the browser.
-      </p>
+
 
       <div className="rounded-lg border bg-card p-5 text-card-foreground">
         <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -116,30 +113,8 @@ export function Connections() {
                 <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">DSN (TNS alias)</dt>
                 <dd>{state.data.dsn}</dd>
               </div>
-              <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Wallet</dt>
-                <dd>{state.data.walletConfigured ? "Configured from .env" : "Not configured"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SIRE schema (Tables.sql)</dt>
-                <dd>{state.data.schemaReady ? "All tables present" : "Tables missing — see below"}</dd>
-              </div>
             </dl>
 
-            {state.data.sireTablesPresent && state.data.sireTablesPresent.length > 0 && (
-              <div className="mt-4">
-                <h4 className="mb-1 font-semibold">Tables present</h4>
-                <ul className="flex flex-wrap gap-1.5">
-                  {state.data.sireTablesPresent.map((table) => (
-                    <li key={table}>
-                      <Badge variant="secondary">
-                        {table}: {state.data.rowCounts?.[table] ?? 0} rows
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
             {state.data.sireTablesMissing && state.data.sireTablesMissing.length > 0 && (
               <div className="mt-4">
                 <h4 className="mb-1 font-semibold">Tables not created yet</h4>

@@ -10,9 +10,9 @@ type ViewerState =
   | { kind: "ready"; url: string }
   | { kind: "error"; message: string };
 
-export function PdfViewer({ invoice }: { invoice: Invoice }) {
+export function PdfViewer({ invoice, live = false }: { invoice: Invoice; live?: boolean }) {
   const [state, setState] = useState<ViewerState>({ kind: "loading" });
-  const documentUrl = `/api/files/${invoice.fileId}/document`;
+  const documentUrl = `/api/files/${invoice.fileId}/document${live ? "?scope=live" : ""}`;
 
   useEffect(() => {
     let cancelled = false;

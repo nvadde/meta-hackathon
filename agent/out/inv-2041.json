@@ -1,0 +1,112 @@
+{
+  "AmountDue": 18450,
+  "BillingAddress": "SIRE Projects, Riverside Tower Site Office",
+  "BillingAddressRecipient": "SIRE Projects",
+  "CustomerAddress": "SIRE Projects, Riverside Tower Site Office",
+  "CustomerAddressRecipient": "SIRE Projects",
+  "CustomerId": "",
+  "CustomerName": "SIRE Projects",
+  "CustomerTaxId": "",
+  "DueDate": "",
+  "InvoiceDate": "2026-10-24",
+  "InvoiceNumber": "INV-2041",
+  "InvoiceTotal": 18450,
+  "PaymentTerm": "",
+  "PreviousUnpaidBalance": 0,
+  "PurchaseOrder": "",
+  "RemittanceAddress": "Atlas Concrete Ltd, 44 Quarry Rd, Austin, TX",
+  "RemittanceAddressRecipient": "Atlas Concrete Ltd",
+  "ShippingAddress": "",
+  "ShippingAddressRecipient": "",
+  "ShippingCost": 0,
+  "Subtotal": 18450,
+  "TotalTax": 0,
+  "TotalVAT": 0,
+  "VendorAddress": "44 Quarry Rd, Austin, TX",
+  "VendorAddressRecipient": "Atlas Concrete Ltd",
+  "VendorName": "Atlas Concrete Ltd",
+  "VendorNameLogo": "",
+  "VendorTaxId": "",
+  "Job": "JOB-5501",
+  "RetDelFee": 1500,
+  "lineitem.Items": [
+    {
+      "LineNum": 1,
+      "Name": "Ready-mix concrete C30",
+      "Quantity": 120,
+      "ProductCode": "",
+      "UnitPrice": 120,
+      "Amount": 14400,
+      "Description": "Ready-mix concrete C30 - 120 m3 x USD 120.00 = USD 14,400.00",
+      "Tax": 0,
+      "Unit": "m3"
+    },
+    {
+      "LineNum": 2,
+      "Name": "Concrete pump hire",
+      "Quantity": 3,
+      "ProductCode": "",
+      "UnitPrice": 850,
+      "Amount": 2550,
+      "Description": "Concrete pump hire - 3 days x USD 850.00 = USD 2,550.00",
+      "Tax": 0,
+      "Unit": "days"
+    },
+    {
+      "LineNum": 3,
+      "Name": "Delivery surcharge",
+      "Quantity": 15,
+      "ProductCode": "",
+      "UnitPrice": 100,
+      "Amount": 1500,
+      "Description": "Delivery surcharge - 15 loads x USD 100.00 = USD 1,500.00",
+      "Tax": 0,
+      "Unit": "loads"
+    }
+  ],
+  "lineitem.LineNum": [
+    1,
+    2,
+    3
+  ],
+  "lineitem.Name": [
+    "Ready-mix concrete C30",
+    "Concrete pump hire",
+    "Delivery surcharge"
+  ],
+  "lineitem.Quantity": [
+    120,
+    3,
+    15
+  ],
+  "lineitem.ProductCode": [
+    "",
+    "",
+    ""
+  ],
+  "lineitem.UnitPrice": [
+    120,
+    850,
+    100
+  ],
+  "lineitem.Amount": [
+    14400,
+    2550,
+    1500
+  ],
+  "lineitem.Description": [
+    "Ready-mix concrete C30 - 120 m3 x USD 120.00 = USD 14,400.00",
+    "Concrete pump hire - 3 days x USD 850.00 = USD 2,550.00",
+    "Delivery surcharge - 15 loads x USD 100.00 = USD 1,500.00"
+  ],
+  "lineitem.Tax": [
+    0,
+    0,
+    0
+  ],
+  "lineitem.Unit": [
+    "m3",
+    "days",
+    "loads"
+  ]
+}

@@ -5,6 +5,7 @@ import { invoiceSources, invoices, processingStatuses } from "../src/data/invoic
 import {
   canApprove,
   createApprovalNotification,
+  createDecisionNotification,
   describeInvoiceChanges,
   deriveMyActions,
   isApprovalTransition,
@@ -69,6 +70,21 @@ test("approval requires remarks and notifies Payables Manager only on transition
   assert.equal(notification.remarks, "Verified against PO and delivery note.");
   assert.equal(notification.invoiceId, after.id);
   assert.equal(notification.invoiceNumber, after.invoiceNumber);
+  assert.equal(notification.read, false);
+});
+
+test("rejection notifies Payables Manager with the rejection remarks", () => {
+  const before = { ...base, status: "Matched" };
+  assert.equal(createDecisionNotification(before, "rejected", "   ", "2026-10-27T10:00:00.000Z"), null);
+  const notification = createDecisionNotification(
+    before,
+    "rejected",
+    "  Wrong supplier.  ",
+    "2026-10-27T10:00:00.000Z",
+  );
+  assert.equal(notification.to, "Payables Manager");
+  assert.equal(notification.type, "Invoice rejected");
+  assert.equal(notification.remarks, "Wrong supplier.");
   assert.equal(notification.read, false);
 });
 

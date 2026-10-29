@@ -32,7 +32,25 @@ export function mapProjectRow(row) {
   };
 }
 
-const KNOWN_SOURCES = new Set(["Gmail", "WhatsApp", "Manual Upload"]);
+/**
+ * Normalize INVOICE_SOURCE to the app's channel list. Oracle rows may carry
+ * any casing or the legacy "Upload"/"Manual" shorthand. When the stored
+ * source is missing or unrecognized, the channel is inferred from the
+ * file_details path (files/<Channel>/... or gmail-/whatsapp-/manual-
+ * filename prefixes); anything else falls back to Manual Upload so the
+ * workbench always shows a real channel badge.
+ */
+export function normalizeSource(value, filePath = "") {
+  const text = String(value ?? "").trim().toLowerCase();
+  if (text === "gmail") return "Gmail";
+  if (text === "whatsapp" || text === "whats app") return "WhatsApp";
+  if (text === "manual upload" || text === "manual" || text === "upload") return "Manual Upload";
+  const pathText = String(filePath ?? "").toLowerCase();
+  if (pathText.includes("/gmail/") || pathText.includes("gmail-")) return "Gmail";
+  if (pathText.includes("/whatsapp/") || pathText.includes("whatsapp-")) return "WhatsApp";
+  if (pathText.includes("/manual/") || pathText.includes("manual-")) return "Manual Upload";
+  return "Manual Upload";
+}
 const KNOWN_STATUSES = new Set([
   "Received",
   "Processing",
@@ -68,7 +86,7 @@ export function mapInvoiceRows(headerRows, lineRows) {
     project: row.PROJECT_NAME ?? "",
     projectNumber: row.PROJECT_NUMBER ?? "",
     jobNumber: row.JOB_NUMBER ?? "",
-    source: KNOWN_SOURCES.has(row.INVOICE_SOURCE) ? row.INVOICE_SOURCE : "Manual Upload",
+    source: normalizeSource(row.INVOICE_SOURCE, row.FILE_PATH),
     receivedDate: toIsoDate(row.RECEIVED_DATE || row.INVOICE_DATE),
     invoiceDate: toIsoDate(row.INVOICE_DATE),
     amount: Number(row.AMOUNT_DUE ?? 0),

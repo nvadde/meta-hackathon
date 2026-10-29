@@ -97,6 +97,7 @@ export interface InvoiceTableProps {
   projectFeed?: ProjectFeedRecord[];
   emptyTitle?: string;
   emptyText?: string;
+  liveSources?: boolean;
 }
 
 export function InvoiceTable({
@@ -108,6 +109,7 @@ export function InvoiceTable({
   projectFeed = sampleProjectFeed,
   emptyTitle = "No invoices match",
   emptyText = "No invoices match the current search and filters. Clear them to see all records.",
+  liveSources = false,
 }: InvoiceTableProps) {
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<"All" | InvoiceSource>("All");
@@ -216,8 +218,8 @@ export function InvoiceTable({
         )}
       </div>
 
-      <div className="mb-4 grid gap-3 rounded-lg border bg-card p-4 text-card-foreground md:grid-cols-2 xl:grid-cols-5">
-        <label className="relative block xl:col-span-2">
+      <div className="mb-4 grid gap-3 rounded-lg border bg-card p-4 text-card-foreground">
+        <label className="relative block">
           <span className="sr-only">Search invoices</span>
           <Search
             aria-hidden="true"
@@ -233,17 +235,18 @@ export function InvoiceTable({
             className="pl-9"
           />
         </label>
-        <label className="block">
-          <span className="sr-only">Filter by source</span>
-          <select
-            value={sourceFilter}
-            onChange={(event) => {
-              setSourceFilter(event.target.value as "All" | InvoiceSource);
-              setPage(1);
-            }}
-            className={cn(selectClassName, "w-full")}
-          >
-            <option value="All">Source: All</option>
+        <div className="grid grid-cols-4 gap-2">
+          <label className="block">
+            <span className="sr-only">Filter by source</span>
+            <select
+              value={sourceFilter}
+              onChange={(event) => {
+                setSourceFilter(event.target.value as "All" | InvoiceSource);
+                setPage(1);
+              }}
+              className={cn(selectClassName, "w-full")}
+            >
+              <option value="All">Source: All</option>
             {invoiceSources.map((source) => (
               <option key={source} value={source}>
                 {source}
@@ -305,6 +308,7 @@ export function InvoiceTable({
             ))}
           </select>
         </label>
+        </div>
       </div>
 
       {pageRows.length === 0 ? (
@@ -393,7 +397,7 @@ export function InvoiceTable({
                       <span className="block text-xs text-muted-foreground">{invoice.projectNumber}</span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">
-                      <SourceBadge source={invoice.source} />
+                      <SourceBadge source={invoice.source} live={liveSources} />
                     </td>
                     <td className="whitespace-nowrap px-3 py-2.5">{formatDate(invoice.receivedDate)}</td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-right font-medium">

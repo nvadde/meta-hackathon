@@ -20,16 +20,18 @@ const sourceStyles: Record<InvoiceSource, { icon: typeof Mail; className: string
   },
 };
 
-export function SourceBadge({ source }: { source: InvoiceSource }) {
-  const { icon: Icon, className } = sourceStyles[source];
+export function SourceBadge({ source, live = false }: { source: InvoiceSource; live?: boolean }) {
+  const { icon: Icon, className } = sourceStyles[source] ?? sourceStyles["Manual Upload"];
+  const label = live ? `${source} (live source channel from Oracle)` : `${source} (sample source label, not a live connection)`;
   return (
     <Badge
       variant="outline"
-      className={cn("gap-1.5 whitespace-nowrap", className)}
-      title={`${source} (sample source label, not a live connection)`}
+      className={cn("gap-1 whitespace-nowrap px-1.5", className)}
+      title={label}
+      aria-label={`Source channel: ${label}`}
     >
       <Icon aria-hidden="true" className="h-3.5 w-3.5" />
-      {source}
+      <span className="sr-only">{label}</span>
     </Badge>
   );
 }

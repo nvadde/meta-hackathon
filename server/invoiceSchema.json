@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SIRE invoice extraction",
+  "description": "JSON format the AI model must return when converting an invoice PDF. Field limits match Tables.sql column sizes.",
+  "type": "object",
+  "required": ["invoice_number", "vendor_name", "amount_due", "currency"],
+  "properties": {
+    "invoice_number": { "type": "string", "maxLength": 30 },
+    "vendor_name": { "type": "string", "maxLength": 300 },
+    "invoice_date": { "type": "string", "description": "YYYY-MM-DD or empty" },
+    "due_date": { "type": "string", "description": "YYYY-MM-DD or empty" },
+    "amount_due": { "type": "number" },
+    "currency": { "type": "string", "enum": ["USD", "EUR", "GBP"] },
+    "project_number": { "type": "string", "maxLength": 30 },
+    "job_number": { "type": "string", "maxLength": 30 },
+    "payment_terms": { "type": "string", "maxLength": 30 },
+    "total_tax": { "type": "number" },
+    "notes": { "type": "string", "maxLength": 500 },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["description", "quantity", "unit_price", "amount"],
+        "properties": {
+          "line_num": { "type": "string", "maxLength": 30 },
+          "description": { "type": "string", "maxLength": 300 },
+          "quantity": { "type": "number" },
+          "units": { "type": "string", "maxLength": 30 },
+          "unit_price": { "type": "number" },
+          "amount": { "type": "number" }
+        }
+      }
+    }
+  }
+}

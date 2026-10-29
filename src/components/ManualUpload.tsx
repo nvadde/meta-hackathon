@@ -26,15 +26,27 @@ interface UploadResponse {
 export function ManualUpload({
   onAddInvoice,
   onOpenInvoice,
+  supplierFeed: supplierFeedProp,
+  projectFeed: projectFeedProp,
+  mode,
+  open,
+  onOpenChange,
 }: {
   onAddInvoice: (invoice: Invoice) => void;
   onOpenInvoice: (invoice: Invoice) => void;
+  supplierFeed?: typeof supplierFeed;
+  projectFeed?: typeof projectFeed;
+  mode: "llama" | "react";
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const supplierFeedActive = supplierFeedProp ?? supplierFeed;
+  const projectFeedActive = projectFeedProp ?? projectFeed;
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [created, setCreated] = useState<Invoice | null>(null);
+  const [dbNote, setDbNote] = useState<string | null>(null);
   const [form, setForm] = useState({
     invoiceNumber: "",
     supplier: "",
@@ -124,12 +136,62 @@ export function ManualUpload({
           },
         ],
       };
-      const validation = validateInvoice(invoice, supplierFeed, projectFeed);
+      const validation = validateInvoice(invoice, supplierFeedActive, projectFeedActive);
       const stored: Invoice =
         validation.level === "invalid" ? { ...invoice, status: "Rejected" } : invoice;
       onAddInvoice(invoice);
       setCreated(stored);
       setFile(null);
+      setDbNote(null);
+      try {
+        const insertResponse = await fetch("/api/convert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileId: data.fileId,
+            mode,
+            invoiceNumber: form.invoiceNumber.trim(),
+            supplier: form.supplier.trim(),
+            project: form.project.trim(),
+            projectNumber: form.projectNumber.trim(),
+            jobNumber: form.jobNumber.trim(),
+            invoiceDate: form.invoiceDate || today(),
+            receivedDate: form.receivedDate || today(),
+            currency: form.currency.trim().toUpperCase() || "USD",
+            amount,
+            remittanceAddress: form.remittanceAddress.trim(),
+            billToAddress: form.billToAddress.trim(),
+            lineDescription: form.lineDescription.trim(),
+            lineQuantity,
+            lineUnits: form.lineUnits.trim() || "ea",
+            lineAmount,
+          }),
+        });
+        const insertData = (await insertResponse.json().catch(() => ({}))) as {
+          error?: string;
+          extracted?: boolean;
+          filledKeys?: string[];
+          attempts?: number;
+        };
+        if (!insertResponse.ok) {
+          throw new Error(insertData.error || `Oracle insert failed (${insertResponse.status})`);
+        }
+        const engineNote =
+          mode === "react" && typeof insertData.attempts === "number"
+            ? ` Agentic loop verified the JSON in ${insertData.attempts} attempt(s).`
+            : "";
+        setDbNote(
+          insertData.filledKeys && insertData.filledKeys.length > 0
+            ? `Saved to the Oracle tables (file_details, invoice_header, invoice_lines) using ${mode === "react" ? "the agentic ReAct loop" : "direct llama extraction"}. The PDF was read and filled: ${insertData.filledKeys.join(", ")}.${engineNote}`
+            : `Saved to the Oracle tables (file_details, invoice_header, invoice_lines) using ${mode === "react" ? "the agentic ReAct loop" : "direct llama extraction"}.${engineNote}`,
+        );
+      } catch (error) {
+        setDbNote(
+          error instanceof Error && error.message !== "Failed to fetch"
+            ? `Kept locally only — Oracle insert failed: ${error.message}`
+            : "Kept locally only — Oracle is not reachable, so the tables were not updated.",
+        );
+      }
     } catch (error) {
       setErrors([
         error instanceof Error && error.message !== "Failed to fetch"
@@ -141,31 +203,23 @@ export function ManualUpload({
     }
   }
 
+  if (!open) return null;
+
   return (
-    <section aria-label="Manual Upload" className="mb-6 rounded-lg border bg-card p-4 text-card-foreground">
+    <section id="manual-upload-panel" aria-label="Manual Upload" className="mb-6 scroll-mt-20 rounded-lg border bg-card p-4 text-card-foreground">
       <div className="flex flex-wrap items-center gap-3">
         <Upload aria-hidden="true" className="h-5 w-5 text-teal-dark dark:text-teal" />
         <div>
           <h3 className="font-semibold">Manual Upload</h3>
           <p className="text-sm text-muted-foreground">
-            Upload a supplier invoice PDF yourself. It is stored under files/invoices/, registered in
+            Upload a supplier invoice PDF yourself. It is stored under files/Manual/, registered in
             file_details, and added to this workbench with source “Manual Upload”.
           </p>
         </div>
-        <Button size="sm" onClick={() => setOpen((current) => !current)} className="ml-auto" aria-expanded={open}>
-          <FileUp aria-hidden="true" /> {open ? "Close upload" : "Upload invoice PDF"}
+        <Button size="sm" onClick={() => onOpenChange(false)} aria-expanded={open}>
+          <FileUp aria-hidden="true" /> Close upload
         </Button>
       </div>
-
-      {created && !open && (
-        <p className="mt-3 rounded-md bg-teal-soft px-3 py-2 text-sm text-teal-dark dark:bg-teal/20 dark:text-teal">
-          Added {created.invoiceNumber} from {created.fileName}.{" "}{created.status === "Rejected" ? `It was automatically rejected: ${INVALID_SUPPLIER_PROJECT_REMARKS}. ` : ""}
-          <button type="button" className="font-semibold underline" onClick={() => onOpenInvoice(created)}>
-            View Details
-          </button>{" "}
-          to check it against the PDF.
-        </p>
-      )}
 
       {open && (
         <div className="mt-4 border-t pt-4">
@@ -189,6 +243,7 @@ export function ManualUpload({
                 View Details
               </button>{" "}
               to check it against the PDF, or add another below.
+              {dbNote && <> {dbNote}</>}
             </p>
           )}
 
@@ -277,15 +332,20 @@ export function ManualUpload({
             </label>
           </div>
 
+          <p className="mt-2 text-sm text-muted-foreground">
+            The engine selected in the top bar converts the PDF: Llama in one pass, Agentic ReAct
+            with validation against the invoice schema until the JSON is clean. Your typed values
+            always win; extraction only fills blanks.
+          </p>
+
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button onClick={handleSubmit} disabled={busy}>
               {busy ? <Loader2 aria-hidden="true" className="animate-spin" /> : <FileUp aria-hidden="true" />}
               {busy ? "Uploading…" : "Upload and add invoice"}
             </Button>
             <span className="text-sm text-muted-foreground">
-              No extraction runs on the PDF. You type the header and first line, then can Edit the
-              invoice later to add more lines. Invoice number and supplier cannot be changed after
-              creation.
+              You type the header and first line, then can Edit the invoice later to add more lines.
+              Invoice number and supplier cannot be changed after creation.
             </span>
           </div>
         </div>

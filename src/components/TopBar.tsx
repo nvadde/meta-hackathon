@@ -5,12 +5,16 @@ import { Button } from "@/components/ui/button";
 
 export type DataMode = "sample" | "live";
 
+export type ConversionEngine = "llama" | "react";
+
 interface TopBarProps {
   pageTitle: string;
   theme: "light" | "dark";
   notificationCount: number;
   dataMode: DataMode;
   onDataModeChange: (mode: DataMode) => void;
+  engine: ConversionEngine;
+  onEngineChange: (engine: ConversionEngine) => void;
   onOpenSidebar: () => void;
   onToggleTheme: () => void;
   onShowNotifications: () => void;
@@ -22,6 +26,8 @@ export function TopBar({
   notificationCount,
   dataMode,
   onDataModeChange,
+  engine,
+  onEngineChange,
   onOpenSidebar,
   onToggleTheme,
   onShowNotifications,
@@ -76,6 +82,40 @@ export function TopBar({
                 }
               >
                 {mode}
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          role="group"
+          aria-label="Conversion engine"
+          className="flex items-center rounded-md border border-input bg-card p-0.5"
+        >
+          <span className="hidden px-2 text-xs font-semibold text-muted-foreground xl:inline">
+            Convert:
+          </span>
+          {(
+            [
+              { value: "llama", label: "Llama", hint: "Direct single-pass PDF extraction" },
+              { value: "react", label: "ReAct", hint: "Agentic validated loop (InvoiceSchema)" },
+            ] as const
+          ).map((option) => {
+            const active = engine === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => onEngineChange(option.value)}
+                aria-pressed={active}
+                title={option.hint}
+                className={
+                  active
+                    ? "rounded-[5px] bg-teal px-2.5 py-1.5 text-xs font-bold text-white"
+                    : "rounded-[5px] px-2.5 py-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                }
+              >
+                {option.label}
               </button>
             );
           })}

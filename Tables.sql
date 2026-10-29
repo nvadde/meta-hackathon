@@ -144,6 +144,8 @@ CREATE TABLE file_details (
     CONSTRAINT pk_file PRIMARY KEY ( file_id )
 );
 
+INSERT INTO file_details (file_id, file_name , original_file_name, file_path, file_size_bytes, mime_type, source_channel, message_id, status, creation_date, updated_date, created_by, updated_by )
+VALUES (file_seq.nextval, 'Test.pdf', 'Test.pdf', '/file/Test.pdf', null, null, 'GMAIL', null, 'V', sysdate, sysdate, '-1', '-1');
 
 -- -----------------------------------------------------------------------------
 -- Invoice header (original table, extended for the review workbench)
@@ -203,14 +205,25 @@ CREATE TABLE invoice_header (
     CONSTRAINT pk_header PRIMARY KEY ( header_id ),
     CONSTRAINT fk_header_file FOREIGN KEY ( file_id )
         REFERENCES file_details ( file_id ),
-    CONSTRAINT fk_header_supplier FOREIGN KEY ( supplier_id )
-        REFERENCES supplier_master ( supplier_id ),
-    CONSTRAINT fk_header_project FOREIGN KEY ( project_id )
-        REFERENCES project_master ( project_id ),
     CONSTRAINT ck_header_exception_count CHECK ( exception_count >= 0 ),
     CONSTRAINT ck_header_review_flag CHECK ( payables_review_confirmed IN ( 'Y', 'N' ) )
 );
 
+INSERT INTO invoice_header (
+    header_id, file_id, supplier_id, project_id, amount_due, due_date,
+    billing_address, billing_address_recipient, customer_address, customer_address_recipient,
+    invoice_source, invoice_type, invoice_number, invoice_date, received_date,
+    invoice_currency, processing_status, exception_count, payables_review_confirmed,
+    project_number, job_number, payment_terms, previous_unpaid_balance,
+    total_tax, vendor_name, supplier_number, supplier_name
+) VALUES (
+    inv_header_seq.nextval, 1, 101, 201, 5400.00, TO_DATE('2026-11-15', 'YYYY-MM-DD'),
+    '123 Corporate Way, Suite 400, Austin, TX 78701', 'Accounts Payable Dept', '123 Corporate Way, Suite 400, Austin, TX 78701', 'ACME Corp',
+    'PORTAL', 'Invoice', 'INV-2026-0089', TO_DATE('2026-10-15', 'YYYY-MM-DD'), TO_DATE('2026-10-16', 'YYYY-MM-DD'),
+    'USD', 'Processed', 0, 'N',
+    'PRJ-992', 'JOB-441', 'Net 30', 0.00,
+    400.00, 'TechSupply Solutions LLC', 'SUP-8899', 'TechSupply Solutions LLC'
+);
 
 -- -----------------------------------------------------------------------------
 -- Invoice lines (original table, extended with units)
@@ -235,6 +248,8 @@ CREATE TABLE invoice_lines (
         REFERENCES invoice_header ( header_id )
 );
 
+insert into invoice_lines (ine_id, header_id, line_num, name, quantity, units, product_code, unit_price, amount, description, creation_date, updated_date, created_by, updated_by)
+values (inv_line_seq.nextval, 2, 1, 'test', 1, 10, 'abc', 10, 100, 'test', sysdate, sysdate, '-1', '-1');
 
 -- -----------------------------------------------------------------------------
 -- Review actions / change log (My Actions "My changes")
@@ -362,3 +377,7 @@ CREATE INDEX ix_lines_header ON invoice_lines ( header_id );
 CREATE INDEX ix_action_header ON invoice_review_action ( header_id );
 CREATE INDEX ix_notification_header ON notification ( header_id );
 CREATE INDEX ix_notification_read ON notification ( is_read );
+
+CREATE SEQUENCE file_seq       start with 1 increment by 1;
+CREATE SEQUENCE inv_header_seq start with 1 increment by 1;
+CREATE SEQUENCE inv_line_seq start with 1 increment by 1;

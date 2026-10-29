@@ -12,8 +12,7 @@ export function EmptyState({ section }: EmptyStateProps) {
       <p className="mb-2 text-[13px] font-bold uppercase tracking-wider text-teal-dark dark:text-teal">
         {section.label}
       </p>
-      <h2 className="mb-2 text-[28px] font-semibold leading-tight">{section.heading}</h2>
-      <p className="mb-6 max-w-[62ch] text-muted-foreground">{section.lead}</p>
+      <h2 className="mb-4 text-[28px] font-semibold leading-tight">{section.heading}</h2>
 
       <div className="rounded-lg border border-dashed bg-card px-6 py-10 text-center text-card-foreground">
         <div

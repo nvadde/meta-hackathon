@@ -1,4 +1,17 @@
 /** Oracle connection settings, read from .env. Secrets stay on the server. */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Relative wallet paths resolve against the project root so the same env
+ * names work locally (absolute Windows path) and on Vercel (bundled
+ * relative wallet dir).
+ */
+export function resolveWalletPath(value) {
+  return path.isAbsolute(value) ? value : path.resolve(projectRoot, value);
+}
 
 export const REQUIRED_DB_ENV_KEYS = [
   "DB_USER",
@@ -22,8 +35,8 @@ export function buildDbConfig(env) {
     user: env.DB_USER,
     password: env.DB_PSW,
     connectString: env.DSN_ADB,
-    configDir: env.CONFIG_DIR,
-    walletLocation: env.WALLET_LOC,
+    configDir: resolveWalletPath(env.CONFIG_DIR),
+    walletLocation: resolveWalletPath(env.WALLET_LOC),
     walletPassword: env.WALLET_PSW,
   };
   config.publicSummary = () => ({

@@ -1,0 +1,162 @@
+[
+    {
+        "key": "AmountDue",
+        "description": "Outstanding amount that remains to be paid."
+    },
+    {
+        "key": "BillingAddress",
+        "description": "Billing address specified on the invoice."
+    },
+    {
+        "key": "BillingAddressRecipient",
+        "description": "Name of the recipient associated with the billing address."
+    },
+    {
+        "key": "CustomerAddress",
+        "description": "Mailing address of the customer."
+    },
+    {
+        "key": "CustomerAddressRecipient",
+        "description": "Name of the recipient associated with the customer address."
+    },
+    {
+        "key": "CustomerId",
+        "description": "Unique identifier assigned to the customer."
+    },
+    {
+        "key": "CustomerName",
+        "description": "Name of the customer receiving the invoice."
+    },
+    {
+        "key": "CustomerTaxId",
+        "description": "Tax identification number of the customer."
+    },
+    {
+        "key": "DueDate",
+        "description": "Date by which payment is due."
+    },
+    {
+        "key": "InvoiceDate",
+        "description": "Date on which the invoice was issued."
+    },
+    {
+        "key": "InvoiceId",
+        "description": "Unique invoice number or identifier."
+    },
+    {
+        "key": "InvoiceTotal",
+        "description": "Final total amount of the invoice including all charges."
+    },
+    {
+        "key": "PaymentTerm",
+        "description": "Payment terms and conditions specified on the invoice."
+    },
+    {
+        "key": "PreviousUnpaidBalance",
+        "description": "Balance carried forward from previous unpaid invoices."
+    },
+    {
+        "key": "PurchaseOrder",
+        "description": "Purchase order number associated with the invoice."
+    },
+    {
+        "key": "RemittanceAddress",
+        "description": "Address where payment should be sent."
+    },
+    {
+        "key": "RemittanceAddressRecipient",
+        "description": "Name of the recipient associated with the remittance address."
+    },
+    {
+        "key": "ShippingAddress",
+        "description": "Shipping or delivery address for the invoice."
+    },
+    {
+        "key": "ShippingAddressRecipient",
+        "description": "Name of the recipient associated with the shipping address."
+    },
+    {
+        "key": "ShippingCost",
+        "description": "Shipping or delivery charges included in the invoice."
+    },
+    {
+        "key": "Subtotal",
+        "description": "Total amount before taxes, shipping, and additional charges."
+    },
+    {
+        "key": "TotalTax",
+        "description": "Total tax amount applied to the invoice."
+    },
+    {
+        "key": "TotalVAT",
+        "description": "Total Value Added Tax (VAT) amount applied to the invoice."
+    },
+    {
+        "key": "VendorAddress",
+        "description": "Mailing or business address of the vendor."
+    },
+    {
+        "key": "VendorAddressRecipient",
+        "description": "Name of the recipient associated with the vendor address."
+    },
+    {
+        "key": "VendorName",
+        "description": "Name of the vendor or supplier issuing the invoice."
+    },
+    {
+        "key": "VendorNameLogo",
+        "description": "Logo or branding associated with the vendor."
+    },
+    {
+        "key": "VendorTaxId",
+        "description": "Tax identification number of the vendor."
+    },
+    {
+        "key": "Job",
+        "description": "Job, project, or work order referenced by the invoice."
+    },
+    {
+        "key": "RetDelFee",
+        "description": "Return, delivery, or related service fee charged on the invoice."
+    },
+    {
+        "key": "lineitem.Items",
+        "description": "Complete line item containing all details for a single product or service."
+    },
+    {
+        "key": "lineitem.LineNum",
+        "description": "Sequential line number of the invoice item."
+    },
+    {
+        "key": "lineitem.Name",
+        "description": "Name of the product or service."
+    },
+    {
+        "key": "lineitem.Quantity",
+        "description": "Quantity of the product or service billed."
+    },
+    {
+        "key": "lineitem.ProductCode",
+        "description": "Product code, SKU, or item identifier."
+    },
+    {
+        "key": "lineitem.UnitPrice",
+        "description": "Price per unit of the product or service."
+    },
+    {
+        "key": "lineitem.Amount",
+        "description": "Total amount charged for the line item."
+    },
+    {
+        "key": "lineitem.Description",
+        "description": "Detailed description of the product or service."
+    },
+    {
+        "key": "lineitem.Tax",
+        "description": "Tax amount applied to the line item."
+    },
+    {
+        "key": "lineitem.Unit",
+        "description": "Unit of measurement for the quantity (e.g., EA, KG, HR)."
+    }
+]

@@ -428,3 +428,41 @@ export const invoices: Invoice[] = invoiceRecords.map((record, index) => {
     filePath: `files/invoices/${fileName}`,
   };
 });
+
+/**
+ * Guard for invoice records restored from browser localStorage. Older saved
+ * states can carry missing or duplicated attachment pointers, which made
+ * every Invoice Details screen show the same sample PDF. Fall back to the
+ * sample records when the stored set cannot point each invoice at its own
+ * document; otherwise keep the stored records (including manual uploads).
+ */
+export function sanitizeStoredInvoices(stored: unknown, fallback: Invoice[]): Invoice[] {
+  if (!Array.isArray(stored) || stored.length === 0) return fallback;
+  // Self-heal: a stored record with the same id as a known sample record
+  // always points at that record's document, even if an older saved state
+  // overwrote the attachment pointers (the cause of one sample PDF showing
+  // for every invoice). User edits to other fields are preserved.
+  const sampleById = new Map(fallback.map((invoice) => [invoice.id, invoice]));
+  const records = (stored as Invoice[]).map((record) => {
+    const sample = record && typeof record.id === "string" ? sampleById.get(record.id) : undefined;
+    if (!sample) return record;
+    return { ...record, fileId: sample.fileId, fileName: sample.fileName, filePath: sample.filePath };
+  });
+  for (const record of records) {
+    if (
+      !record ||
+      typeof record.id !== "string" ||
+      !Number.isInteger(record.fileId) ||
+      typeof record.filePath !== "string" ||
+      record.filePath.length === 0
+    ) {
+      return fallback;
+    }
+  }
+  if (records.length > 1) {
+    const fileIds = new Set(records.map((record) => record.fileId));
+    const filePaths = new Set(records.map((record) => record.filePath));
+    if (fileIds.size === 1 || filePaths.size === 1) return fallback;
+  }
+  return records;
+}

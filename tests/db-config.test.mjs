@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 import test from "node:test";
 
-import { buildDbConfig, missingDbEnvKeys } from "../server/db-config.mjs";
+import { buildDbConfig, missingDbEnvKeys, resolveWalletPath } from "../server/db-config.mjs";
 
 const fullEnv = {
   DB_USER: "HACK",
@@ -26,6 +27,15 @@ test("buildDbConfig maps .env wallet settings without exposing passwords in the 
   assert.equal(summary.dsn, "mydb_high");
   assert.equal(summary.walletConfigured, true);
   assert.ok(!JSON.stringify(summary).includes("secret"));
+});
+
+test("resolveWalletPath keeps absolute paths but anchors relative ones to the project", () => {
+  assert.equal(resolveWalletPath("F:\\wallet"), "F:\\wallet");
+  const relative = resolveWalletPath("wallet");
+  assert.ok(path.isAbsolute(relative));
+  assert.ok(relative.endsWith(`${path.sep}wallet`));
+  const config = buildDbConfig({ ...fullEnv, WALLET_LOC: "wallet", CONFIG_DIR: "wallet" });
+  assert.equal(config.walletLocation, relative);
 });
 
 test("missingDbEnvKeys reports what is absent so the API can fail honestly", () => {

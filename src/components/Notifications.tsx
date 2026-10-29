@@ -28,10 +28,7 @@ export function Notifications({
         )}
       </div>
       <h2 className="mb-2 text-[28px] font-semibold leading-tight">Notifications</h2>
-      <p className="mb-6 max-w-[65ch] text-muted-foreground">
-        In-app notifications for Payables Manager. Approving an invoice creates one here with the
-        approver&apos;s remarks/comments. No email or external message is sent.
-      </p>
+
 
       {notifications.length === 0 ? (
         <div className="rounded-lg border border-dashed bg-card px-6 py-10 text-center text-card-foreground">

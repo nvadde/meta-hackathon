@@ -24,8 +24,40 @@ type LoadState =
   | { kind: "ready"; data: GmailStatus }
   | { kind: "unavailable" };
 
-export function SourceConnections() {
+export function SourceConnections({
+  engine,
+  onUpload,
+}: {
+  engine: "llama" | "react";
+  onUpload: () => void;
+}) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+
+  async function syncGmailToOracle() {
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const response = await fetch("/api/sources/gmail/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: engine }),
+      });
+      const data = await response.json();
+      if (!response.ok || data.ok === false) throw new Error(data.error || "Sync failed");
+      const notes = (data.notes || []).join("; ");
+      setSyncMessage(
+        `Sync done (${engine === "react" ? "ReAct" : "Llama"}): ${data.imported} imported, ${data.skipped} skipped, ${data.checked} checked.` +
+          (data.errors?.length ? ` Errors: ${data.errors.length}.` : " Switch the header toggle to Live to review them.") +
+          (notes ? ` Notes: ${notes}` : ""),
+      );
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -46,10 +78,10 @@ export function SourceConnections() {
   }, []);
 
   return (
-    <section aria-label="Source connections" className="mb-6 grid gap-4 lg:grid-cols-3">
-      <div className="rounded-lg border bg-card p-4 text-card-foreground">
-        <div className="mb-2 flex items-center gap-2">
-          <Mail aria-hidden="true" className="h-5 w-5 text-red-600 dark:text-red-400" />
+    <section aria-label="Source connections" className="mb-6 grid gap-3 lg:grid-cols-3">
+      <div className="rounded-lg border bg-card px-3 py-2.5 text-card-foreground">
+        <div className="flex items-center gap-2">
+          <Mail aria-hidden="true" className="h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
           <h3 className="font-semibold">Gmail</h3>
           {state.kind === "loading" && (
             <Badge variant="secondary" className="ml-auto gap-1">
@@ -68,77 +100,68 @@ export function SourceConnections() {
           )}
         </div>
 
-        {state.kind === "loading" && (
-          <p className="text-sm text-muted-foreground">Checking the live Gmail connection…</p>
-        )}
         {state.kind === "unavailable" && (
-          <p className="text-sm text-muted-foreground">
-            The Gmail backend is not running, so live mailbox data cannot be shown. Start it with{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">npm run server</code> alongside the
-            dev server. The synthetic invoice records below are unaffected.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Backend not running — start it with{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">npm run server</code>.
           </p>
         )}
         {state.kind === "ready" && !state.data.connected && (
-          <p className="text-sm text-muted-foreground">
-            Gmail did not connect{state.data.error ? `: ${state.data.error}` : "."} Check that{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">credentials.json</code> and{" "}
-            <code className="rounded bg-muted px-1 py-0.5 text-xs">token.json</code> are present.
+          <p className="mt-1 text-sm text-muted-foreground">
+            Not connected{state.data.error ? `: ${state.data.error}` : "."}
           </p>
         )}
         {state.kind === "ready" && state.data.connected && (
           <div>
-            <p className="text-sm text-muted-foreground">
-              Mailbox <span className="font-medium text-foreground">{state.data.emailAddress}</span>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {state.data.emailAddress}
               {typeof state.data.messagesTotal === "number" && (
-                <> · {state.data.messagesTotal.toLocaleString()} messages total</>
+                <> · {state.data.messagesTotal.toLocaleString()} total</>
               )}
-              . Recent message subjects are shown live below. No invoice extraction runs yet.
             </p>
-            {state.data.recentMessages && state.data.recentMessages.length > 0 && (
-              <ul className="mt-3 space-y-2">
-                {state.data.recentMessages.slice(0, 5).map((message) => (
-                  <li key={message.id} className="rounded-md border px-3 py-2 text-sm">
-                    <span className="block truncate font-medium">{message.subject || "(no subject)"}</span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {message.from} · {message.date}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={syncing}
+                onClick={syncGmailToOracle}
+                className="rounded-md bg-teal px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {syncing ? "Syncing…" : "Sync to Oracle"}
+              </button>
+            </div>
+            {syncMessage && <p className="mt-1 text-sm text-muted-foreground">{syncMessage}</p>}
           </div>
         )}
       </div>
 
-      <div className="rounded-lg border bg-card p-4 text-card-foreground">
-        <div className="mb-2 flex items-center gap-2">
-          <Upload aria-hidden="true" className="h-5 w-5 text-muted-foreground" />
+      <div className="rounded-lg border bg-card px-3 py-2.5 text-card-foreground">
+        <div className="flex items-center gap-2">
+          <Upload aria-hidden="true" className="h-5 w-5 shrink-0 text-muted-foreground" />
           <h3 className="font-semibold">Manual Upload</h3>
           <Badge variant="secondary" className="ml-auto">
             Source channel
           </Badge>
         </div>
-        <p className="text-sm text-muted-foreground">
-          Manual Upload is the source channel for invoices you upload yourself with the panel below,
-          instead of arriving by Gmail or WhatsApp. Use <strong>Upload invoice PDF</strong> there to add
-          one.
-        </p>
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={onUpload}
+            className="rounded-md bg-teal px-3 py-1.5 text-sm font-medium text-white"
+          >
+            Upload invoice PDF
+          </button>
+        </div>
       </div>
 
-      <div className="rounded-lg border bg-card p-4 text-card-foreground">
-        <div className="mb-2 flex items-center gap-2">
-          <MessageCircle aria-hidden="true" className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+      <div className="rounded-lg border bg-card px-3 py-2.5 text-card-foreground">
+        <div className="flex items-center gap-2">
+          <MessageCircle aria-hidden="true" className="h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
           <h3 className="font-semibold">WhatsApp</h3>
           <Badge variant="secondary" className="ml-auto">
             Setup pending
           </Badge>
         </div>
-        <p className="text-sm text-muted-foreground">
-          WhatsApp is not connected. A phone number alone cannot receive messages — this needs a
-          WhatsApp Business (Meta) or Twilio account with an access token. Until those credentials are
-          supplied, WhatsApp badges on the synthetic records below are sample labels only, and no
-          WhatsApp messages are sent or received.
-        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Needs a WhatsApp Business or Twilio token.</p>
       </div>
     </section>
   );

@@ -5,6 +5,7 @@ import {
   mapInvoiceRows,
   mapProjectRow,
   mapSupplierRow,
+  normalizeSource,
 } from "../server/live-data.mjs";
 
 test("mapSupplierRow and mapProjectRow shape Oracle rows like the ERP feeds", () => {
@@ -44,6 +45,35 @@ test("mapSupplierRow and mapProjectRow shape Oracle rows like the ERP feeds", ()
       address: "12 Riverbank Ave",
     },
   );
+});
+
+test("normalizeSource maps Oracle source values to channel badges", () => {
+  assert.equal(normalizeSource("Gmail"), "Gmail");
+  assert.equal(normalizeSource("GMAIL"), "Gmail");
+  assert.equal(normalizeSource("whatsapp"), "WhatsApp");
+  assert.equal(normalizeSource("WhatsApp"), "WhatsApp");
+  assert.equal(normalizeSource("Manual Upload"), "Manual Upload");
+  assert.equal(normalizeSource("Manual"), "Manual Upload");
+  assert.equal(normalizeSource("Upload"), "Manual Upload");
+  assert.equal(normalizeSource(null), "Manual Upload");
+  assert.equal(normalizeSource(" carrier pigeon "), "Manual Upload");
+  assert.equal(normalizeSource(null, "files/Gmail/gmail-1-a.pdf"), "Gmail");
+  assert.equal(normalizeSource("", "files/Whatsapp/whatsapp-1-b.pdf"), "WhatsApp");
+  assert.equal(normalizeSource("legacy", "files/Manual/manual-1-c.pdf"), "Manual Upload");
+  assert.equal(normalizeSource(" carrier pigeon ", "files/invoices/gmail-1793226427993-844781.pdf"), "Gmail");
+  assert.equal(normalizeSource("Manual Upload", "files/Gmail/gmail-1-a.pdf"), "Manual Upload");
+});
+
+test("mapInvoiceRows keeps the live source channel", () => {
+  const [one, two] = mapInvoiceRows(
+    [
+      { HEADER_ID: 1, FILE_ID: 1, INVOICE_NUMBER: "A", INVOICE_SOURCE: "GMAIL" },
+      { HEADER_ID: 2, FILE_ID: 2, INVOICE_NUMBER: "B", INVOICE_SOURCE: "whatsapp" },
+    ],
+    [],
+  );
+  assert.equal(one.source, "Gmail");
+  assert.equal(two.source, "WhatsApp");
 });
 
 test("mapInvoiceRows groups lines under headers and carries the file path", () => {

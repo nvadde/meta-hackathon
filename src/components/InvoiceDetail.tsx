@@ -116,6 +116,7 @@ export function InvoiceDetail({
   supplierFeed = sampleSupplierFeed,
   projectFeed = sampleProjectFeed,
   readOnly = false,
+  liveDecisions = false,
   onSave,
   onApprove,
   onReject,
@@ -124,12 +125,21 @@ export function InvoiceDetail({
   supplierFeed?: SupplierFeedRecord[];
   projectFeed?: ProjectFeedRecord[];
   readOnly?: boolean;
+  liveDecisions?: boolean;
   edited: boolean;
   backLabel: string;
   onBack: () => void;
   onSave: (updated: Invoice, approvalRemarks?: string) => string[];
-  onApprove: (invoice: Invoice, approvalRemarks: string, payablesReviewConfirmed: boolean) => void;
-  onReject: (invoice: Invoice, remarks: string, payablesReviewConfirmed: boolean) => void;
+  onApprove: (
+    invoice: Invoice,
+    approvalRemarks: string,
+    payablesReviewConfirmed: boolean,
+  ) => string[] | Promise<string[]> | void;
+  onReject: (
+    invoice: Invoice,
+    remarks: string,
+    payablesReviewConfirmed: boolean,
+  ) => string[] | Promise<string[]> | void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<FormDraft>(() => toDraft(invoice));
@@ -165,35 +175,51 @@ export function InvoiceDetail({
     setEditing(true);
   }
 
-  function handleApprove() {
+  async function handleApprove() {
     if (!approvalRemarks.trim()) {
       setApprovalError("Remarks/comments are required to approve. They are sent to Payables Manager with the notification.");
       return;
     }
     setApprovalError("");
-    onApprove(invoice, approvalRemarks.trim(), reviewConfirmed);
-    setSavedChanges([
-      `Processing status: ${invoice.status} → Approved`,
-      ...(validation.level === "review" ? ["Payables team review confirmed before approval"] : []),
-      `Notification to Payables Manager: "${approvalRemarks.trim()}"`,
-    ]);
-    setApprovalRemarks("");
+    try {
+      const changes = await onApprove(invoice, approvalRemarks.trim(), reviewConfirmed);
+      setSavedChanges(
+        changes && changes.length > 0
+          ? changes
+          : [
+              `Processing status: ${invoice.status} → Approved`,
+              ...(validation.level === "review" ? ["Payables team review confirmed before approval"] : []),
+              `Notification to Payables Manager: "${approvalRemarks.trim()}"`,
+            ],
+      );
+      setApprovalRemarks("");
+    } catch (error) {
+      setApprovalError(error instanceof Error ? error.message : String(error));
+    }
   }
 
-  function handleReject() {
+  async function handleReject() {
     const remarks = approvalRemarks.trim() || (validation.level === "invalid" ? INVALID_SUPPLIER_PROJECT_REMARKS : "");
     if (!remarks) {
       setApprovalError("Remarks/comments are required to reject this invoice.");
       return;
     }
     setApprovalError("");
-    onReject(invoice, remarks, reviewConfirmed);
-    setSavedChanges([
-      `Processing status: ${invoice.status} → Rejected`,
-      ...(validation.level === "review" ? ["Payables team review confirmed before rejection"] : []),
-      `Rejection remarks: "${remarks}"`,
-    ]);
-    setApprovalRemarks("");
+    try {
+      const changes = await onReject(invoice, remarks, reviewConfirmed);
+      setSavedChanges(
+        changes && changes.length > 0
+          ? changes
+          : [
+              `Processing status: ${invoice.status} → Rejected`,
+              ...(validation.level === "review" ? ["Payables team review confirmed before rejection"] : []),
+              `Rejection remarks: "${remarks}"`,
+            ],
+      );
+      setApprovalRemarks("");
+    } catch (error) {
+      setApprovalError(error instanceof Error ? error.message : String(error));
+    }
   }
 
   function updateLine(index: number, patch: Partial<LineDraft>) {
@@ -336,9 +362,10 @@ export function InvoiceDetail({
 
       {readOnly && (
         <p className="mb-4 rounded-md border bg-card px-3 py-2 text-sm text-muted-foreground">
-          Live Oracle data is read-only in this step. Editing, approving, and rejecting are disabled
-          until invoice write-back to Oracle is connected. Switch the header toggle to Sample to work
-          with the editable synthetic records.
+          Live Oracle data: editing header fields is disabled in this step, but approving and
+          rejecting write to Oracle (review action, Payables Manager notification
+          {liveDecisions ? ", and ERP queue for approvals" : ""}). Switch the header toggle to Sample
+          to work with the editable synthetic records.
         </p>
       )}
 
@@ -392,7 +419,7 @@ export function InvoiceDetail({
           This invoice is rejected. Its rejection is recorded in My Actions.
         </p>
       )}
-      {!readOnly && !editing && invoice.status !== "Approved" && invoice.status !== "Rejected" && (
+      {(!readOnly || liveDecisions) && !editing && invoice.status !== "Approved" && invoice.status !== "Rejected" && (
         <div className="mb-4 rounded-lg border bg-card p-4 text-card-foreground">
           {validation.level === "review" && !invoice.payablesReviewConfirmed && (
             <label className="mb-4 flex items-start gap-2 text-sm">
@@ -618,8 +645,7 @@ export function InvoiceDetail({
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Source channel</dt>
               <dd className="mt-1">
-                <SourceBadge source={invoice.source} />
-                <span className="ml-2 text-xs text-muted-foreground">Sample label, not a live connection</span>
+                <SourceBadge source={invoice.source} live={liveDecisions} />
               </dd>
             </div>
             <DetailField label="Remittance address" value={invoice.remittanceAddress} />
@@ -746,7 +772,7 @@ export function InvoiceDetail({
       )}
 
       <div className="mt-8">
-        <PdfViewer invoice={invoice} />
+        <PdfViewer invoice={invoice} live={readOnly} />
       </div>
 
       <p className="mt-4 text-sm text-muted-foreground">

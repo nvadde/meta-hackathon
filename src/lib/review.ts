@@ -26,7 +26,7 @@ export interface ApprovalNotification {
   invoiceNumber: string;
   supplier: string;
   to: "Payables Manager";
-  type: "Invoice approved";
+  type: "Invoice approved" | "Invoice rejected";
   remarks: string;
   at: string;
   read: boolean;
@@ -39,6 +39,31 @@ export function isApprovalTransition(before: Invoice, after: Invoice): boolean {
 }
 
 /**
+ * Builds the Payables Manager notification for a decision.
+ * Remarks/comments are mandatory: blank remarks return null.
+ */
+export function createDecisionNotification(
+  invoice: Invoice,
+  decision: "approved" | "rejected",
+  remarks: string,
+  at: string,
+): ApprovalNotification | null {
+  const trimmed = remarks.trim();
+  if (!trimmed) return null;
+  return {
+    id: `${at}-${invoice.id}-${decision}`,
+    invoiceId: invoice.id,
+    invoiceNumber: invoice.invoiceNumber,
+    supplier: invoice.supplier,
+    to: APPROVAL_RECIPIENT,
+    type: decision === "approved" ? "Invoice approved" : "Invoice rejected",
+    remarks: trimmed,
+    at,
+    read: false,
+  };
+}
+
+/**
  * Builds the Payables Manager notification for an approval.
  * Remarks/comments are mandatory: blank remarks return null.
  */
@@ -47,19 +72,7 @@ export function createApprovalNotification(
   remarks: string,
   at: string,
 ): ApprovalNotification | null {
-  const trimmed = remarks.trim();
-  if (!trimmed) return null;
-  return {
-    id: `${at}-${invoice.id}`,
-    invoiceId: invoice.id,
-    invoiceNumber: invoice.invoiceNumber,
-    supplier: invoice.supplier,
-    to: APPROVAL_RECIPIENT,
-    type: "Invoice approved",
-    remarks: trimmed,
-    at,
-    read: false,
-  };
+  return createDecisionNotification(invoice, "approved", remarks, at);
 }
 
 const headerFields: {

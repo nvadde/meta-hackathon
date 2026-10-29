@@ -9,14 +9,15 @@ import { Connections } from "@/components/Connections";
 import { Notifications } from "@/components/Notifications";
 import { Projects } from "@/components/Projects";
 import { Suppliers } from "@/components/Suppliers";
-import { TopBar, type DataMode } from "@/components/TopBar";
-import { invoices as sampleInvoices, type Invoice } from "@/data/invoices";
+import { TopBar, type ConversionEngine, type DataMode } from "@/components/TopBar";
+import { invoices as sampleInvoices, sanitizeStoredInvoices, type Invoice } from "@/data/invoices";
 import { sections } from "@/data/sections";
 import { useTheme } from "@/hooks/useTheme";
 import { projectFeed as sampleProjectFeed, type ProjectFeedRecord } from "@/data/projects";
 import { supplierFeed as sampleSupplierFeed, type SupplierFeedRecord } from "@/data/suppliers";
 import {
   createApprovalNotification,
+  createDecisionNotification,
   describeInvoiceChanges,
   isApprovalTransition,
   type ApprovalNotification,
@@ -74,7 +75,10 @@ export default function App() {
   const [activeId, setActiveId] = useState("overview");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [invoiceRecords, setInvoiceRecords] = useState<Invoice[]>(() =>
-    migrateInvoices(load<Invoice[]>(INVOICES_KEY, sampleInvoices)),
+    sanitizeStoredInvoices(
+      migrateInvoices(load<Invoice[]>(INVOICES_KEY, sampleInvoices)),
+      sampleInvoices,
+    ),
   );
   const [editedIds, setEditedIds] = useState<ReadonlySet<string>>(
     () => new Set(load<string[]>(EDITED_KEY, [])),
@@ -88,6 +92,7 @@ export default function App() {
   const [detailOrigin, setDetailOrigin] = useState<DetailOrigin>("workbench");
   const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [engine, setEngine] = useState<ConversionEngine>("llama");
   const [dataMode, setDataMode] = useState<DataMode>(() =>
     load<string>(DATA_MODE_KEY, "sample") === "live" ? "live" : "sample",
   );
@@ -213,7 +218,16 @@ export default function App() {
         );
       }
       if (current.status !== "Rejected" && updated.status === "Rejected" && approvalRemarks) {
+        notification = createDecisionNotification(
+          updated,
+          "rejected",
+          approvalRemarks,
+          new Date().toISOString(),
+        );
         changes.push(`Rejection remarks: "${approvalRemarks}"`);
+        if (notification) {
+          changes.push(`Notification to Payables Manager: "${notification.remarks}"`);
+        }
       }
       if (
         updated.payablesReviewConfirmed &&
@@ -272,21 +286,113 @@ export default function App() {
     ]);
   }, []);
 
+  const decideLiveInvoice = useCallback(
+    async (
+      invoice: Invoice,
+      decision: "approve" | "reject",
+      remarks: string,
+      payablesReviewConfirmed: boolean,
+    ): Promise<string[]> => {
+      const headerId = invoice.id.startsWith("db-") ? Number(invoice.id.slice(3)) : Number.NaN;
+      if (!Number.isInteger(headerId)) {
+        throw new Error("Only Oracle invoices can be decided in Live mode.");
+      }
+      let response: Response;
+      try {
+        response = await fetch("/api/reviews/decision", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ headerId, decision, remarks }),
+        });
+      } catch {
+        throw new Error(
+          "The backend is not reachable. Start it with npm run server, then try again. Nothing was recorded in Oracle.",
+        );
+      }
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        oldStatus?: string;
+        newStatus?: string;
+        queued?: { status: string };
+      };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || `Oracle decision failed (${response.status})`);
+      }
+      const newStatus = data.newStatus === "Rejected" ? "Rejected" : "Approved";
+      const at = new Date().toISOString();
+      setLiveState((state) =>
+        state.kind === "ready"
+          ? {
+              ...state,
+              data: {
+                ...state.data,
+                invoices: state.data.invoices.map((item) =>
+                  item.id === invoice.id
+                    ? { ...item, status: newStatus, payablesReviewConfirmed }
+                    : item,
+                ),
+              },
+            }
+          : state,
+      );
+      const notification = createDecisionNotification(
+        { ...invoice, status: newStatus },
+        decision === "approve" ? "approved" : "rejected",
+        remarks,
+        at,
+      );
+      if (notification) {
+        setNotifications((items) => [notification as ApprovalNotification, ...items]);
+      }
+      const changes = [
+        `Processing status: ${data.oldStatus ?? invoice.status} → ${newStatus}`,
+        `Notification to Payables Manager: "${remarks.trim()}"`,
+        ...(data.queued && data.queued.status === "queued"
+          ? ["Queued for ERP pickup (erp_invoice_queue)."]
+          : []),
+      ];
+      setChangeLog((log) => [
+        {
+          id: `${Date.now()}-${invoice.id}`,
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.invoiceNumber,
+          supplier: invoice.supplier,
+          at,
+          changes,
+        },
+        ...log,
+      ]);
+      return changes;
+    },
+    [],
+  );
+
   const approveInvoice = useCallback(
-    (invoice: Invoice, approvalRemarks: string, payablesReviewConfirmed: boolean) => {
-      saveInvoice(
+    (
+      invoice: Invoice,
+      approvalRemarks: string,
+      payablesReviewConfirmed: boolean,
+    ): string[] | Promise<string[]> | void => {
+      if (isLive) return decideLiveInvoice(invoice, "approve", approvalRemarks, payablesReviewConfirmed);
+      return saveInvoice(
         { ...invoice, status: "Approved", payablesReviewConfirmed },
         approvalRemarks,
       );
     },
-    [saveInvoice],
+    [isLive, decideLiveInvoice, saveInvoice],
   );
 
   const rejectInvoice = useCallback(
-    (invoice: Invoice, remarks: string, payablesReviewConfirmed: boolean) => {
-      saveInvoice({ ...invoice, status: "Rejected", payablesReviewConfirmed }, remarks);
+    (
+      invoice: Invoice,
+      remarks: string,
+      payablesReviewConfirmed: boolean,
+    ): string[] | Promise<string[]> | void => {
+      if (isLive) return decideLiveInvoice(invoice, "reject", remarks, payablesReviewConfirmed);
+      return saveInvoice({ ...invoice, status: "Rejected", payablesReviewConfirmed }, remarks);
     },
-    [saveInvoice],
+    [isLive, decideLiveInvoice, saveInvoice],
   );
 
   const markAllNotificationsRead = useCallback(() => {
@@ -365,6 +471,8 @@ export default function App() {
           notificationCount={unreadCount}
           dataMode={dataMode}
           onDataModeChange={changeDataMode}
+          engine={engine}
+          onEngineChange={setEngine}
           onOpenSidebar={() => setSidebarOpen(true)}
           onToggleTheme={toggleTheme}
           onShowNotifications={() => selectSection("notifications")}
@@ -395,10 +503,12 @@ export default function App() {
           )}
           {showDetail ? (
             <InvoiceDetail
+              key={selectedInvoice.id}
               invoice={selectedInvoice}
               supplierFeed={activeSupplierFeed}
               projectFeed={activeProjectFeed}
               readOnly={isLive}
+              liveDecisions={isLive}
               edited={!isLive && editedIds.has(selectedInvoice.id)}
               backLabel={
                 detailOrigin === "actions"
@@ -418,6 +528,7 @@ export default function App() {
             <InvoiceWorkbench
               invoices={activeInvoices}
               dataMode={dataMode}
+              engine={engine}
               supplierFeed={activeSupplierFeed}
               projectFeed={activeProjectFeed}
               onSelectInvoice={(invoice) => openInvoice(invoice, "workbench")}
@@ -430,7 +541,7 @@ export default function App() {
               supplierFeed={activeSupplierFeed}
               projectFeed={activeProjectFeed}
               editedIds={isLive ? new Set<string>() : editedIds}
-              changeLog={isLive ? [] : changeLog}
+              changeLog={changeLog}
               onSelectInvoice={(invoice) => openInvoice(invoice, "actions")}
               onResetData={resetData}
             />
@@ -442,6 +553,7 @@ export default function App() {
               selectedSupplier={selectedSupplier}
               onSelectSupplier={setSelectedSupplier}
               onSelectInvoice={(invoice) => openInvoice(invoice, "suppliers")}
+              liveSources={isLive}
             />
           ) : activeSection.id === "projects" ? (
             <Projects
@@ -451,6 +563,7 @@ export default function App() {
               selectedProject={selectedProject}
               onSelectProject={setSelectedProject}
               onSelectInvoice={(invoice) => openInvoice(invoice, "projects")}
+              liveSources={isLive}
             />
           ) : activeSection.id === "connections" ? (
             <Connections />

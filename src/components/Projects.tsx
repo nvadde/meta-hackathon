@@ -70,6 +70,7 @@ export function Projects({
   selectedProject,
   onSelectProject,
   onSelectInvoice,
+  liveSources = false,
 }: {
   invoices: Invoice[];
   supplierFeed: SupplierFeedRecord[];
@@ -77,6 +78,7 @@ export function Projects({
   selectedProject: string | null;
   onSelectProject: (project: string | null) => void;
   onSelectInvoice: (invoice: Invoice) => void;
+  liveSources?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"All" | ProjectStatus>("All");
@@ -152,6 +154,7 @@ export function Projects({
           projectFeed={projectFeed}
           emptyTitle="No invoices for this project"
           emptyText="This project has no invoices in the current workbench records."
+          liveSources={liveSources}
         />
       </section>
     );
@@ -163,12 +166,6 @@ export function Projects({
         Projects
       </p>
       <h2 className="mb-2 text-[28px] font-semibold leading-tight">Projects</h2>
-      <p className="mb-6 max-w-[75ch] text-muted-foreground">
-        Project Details feed received from ERP — shown here as a clearly labeled synthetic sample
-        feed, because ERP is not connected. The “No. of invoices” counts the current workbench records
-        for each project, including Manual Uploads. Choose a project to see its invoices, then open an
-        invoice to reach its detail screen.
-      </p>
 
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="text-sm font-medium">

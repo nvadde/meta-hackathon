@@ -46,3 +46,42 @@ test("every invoice has a file_details PDF that exists and is served from its st
     );
   }
 });
+
+test("stored invoices with one shared file_id are discarded so details never repeat one attachment", async () => {
+  const { sanitizeStoredInvoices, invoices } = await import("../src/data/invoices.ts");
+  const corrupted = invoices.map((invoice) => ({
+    ...invoice,
+    fileId: invoices[0].fileId,
+    fileName: invoices[0].fileName,
+    filePath: invoices[0].filePath,
+  }));
+  assert.deepEqual(
+    sanitizeStoredInvoices(corrupted, invoices),
+    invoices,
+    "all records sharing one attachment must fall back to the sample records",
+  );
+  assert.deepEqual(
+    sanitizeStoredInvoices(invoices, []),
+    invoices,
+    "records with distinct attachments must be kept",
+  );
+  const scrambled = invoices.map((invoice, index) => ({
+    ...invoice,
+    amount: invoice.amount + 1,
+    fileId: invoices[(index + 3) % invoices.length].fileId,
+    fileName: invoices[(index + 3) % invoices.length].fileName,
+    filePath: invoices[(index + 3) % invoices.length].filePath,
+  }));
+  const healed = sanitizeStoredInvoices(scrambled, invoices);
+  assert.notEqual(healed, invoices, "edited stored records must be kept, not discarded");
+  for (let index = 0; index < invoices.length; index += 1) {
+    assert.equal(healed[index].fileId, invoices[index].fileId, `record ${index} heals to its own attachment`);
+    assert.equal(healed[index].filePath, invoices[index].filePath, `record ${index} heals to its own file path`);
+    assert.equal(healed[index].amount, invoices[index].amount + 1, `record ${index} keeps user edits`);
+  }
+  assert.equal(
+    sanitizeStoredInvoices([{ id: "broken" }], invoices),
+    invoices,
+    "records missing attachment fields must fall back to the sample records",
+  );
+});
