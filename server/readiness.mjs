@@ -1,9 +1,10 @@
 /**
  * Automatic Ready marking. Invoice headers that meet every condition without
- * user intervention — known active supplier and project, zero exceptions,
- * and lines reconciling to the header total — move from Received/Processing/
- * Matched to Ready so the ERP queue can pick them up. Anything else stays
- * for human review. Each promotion is recorded in invoice_review_action.
+ * user intervention — known active supplier, zero exceptions, and lines
+ * reconciling to the header total — move from Received/Processing/Matched to
+ * Ready so the ERP queue can pick them up. Project is not a condition.
+ * Anything else stays for human review. Each promotion is recorded in
+ * invoice_review_action.
  */
 import oracledb from "oracledb";
 
@@ -33,16 +34,6 @@ export async function findReadyCandidates(connection) {
       .filter((row) => (row.STATUS || "Active") === "Active")
       .map((row) => String(row.SUPPLIER_NAME || "").toLowerCase()),
   );
-  const projectResult = await connection.execute(
-    "SELECT project_number, status FROM project_master",
-    [],
-    { outFormat: oracledb.OUT_FORMAT_OBJECT },
-  );
-  const activeProjects = new Set(
-    (projectResult.rows || [])
-      .filter((row) => (row.STATUS || "Active") === "Active")
-      .map((row) => String(row.PROJECT_NUMBER || "").toLowerCase()),
-  );
   const ids = headers.map((row) => row.HEADER_ID);
   const lineResult = await connection.execute(
     `SELECT header_id, SUM(amount) AS line_total FROM invoice_lines
@@ -53,9 +44,7 @@ export async function findReadyCandidates(connection) {
   const totals = new Map((lineResult.rows || []).map((row) => [row.HEADER_ID, Number(row.LINE_TOTAL ?? 0)]));
   const candidates = headers.filter((row) => {
     const supplier = String(row.SUPPLIER_NAME || row.VENDOR_NAME || "").toLowerCase();
-    const project = String(row.PROJECT_NUMBER || "").toLowerCase();
     if (!activeSuppliers.has(supplier)) return false;
-    if (!activeProjects.has(project)) return false;
     const total = Number(row.AMOUNT_DUE ?? 0);
     const lines = totals.get(row.HEADER_ID);
     if (lines === undefined) return false;
@@ -83,7 +72,7 @@ export async function markReadyInvoices(connection, { createdBy = "SIRE" } = {})
         ["ACTION_BY", createdBy],
         ["OLD_STATUS", row.PROCESSING_STATUS],
         ["NEW_STATUS", "Ready"],
-        ["REMARKS", "Automatically marked Ready: active supplier/project, no exceptions, lines reconcile."],
+        ["REMARKS", "Automatically marked Ready: active supplier, no exceptions, lines reconcile."],
         ["CHANGE_TEXT", `Processing status: ${row.PROCESSING_STATUS} → Ready (automatic)`],
         ["CREATION_DATE", new Date()],
         ["CREATED_BY", createdBy],

@@ -6,6 +6,7 @@ import { recordReviewDecision } from "../server/review-decision.mjs";
 function stubConnection({ headerRow, queueRows = [] } = {}) {
   const seen = [];
   let nextId = 800;
+  let currentStatus = headerRow?.PROCESSING_STATUS;
   return {
     seen,
     execute: async (sql, binds) => {
@@ -24,7 +25,13 @@ function stubConnection({ headerRow, queueRows = [] } = {}) {
         return { rows: (cols[binds[0]] || []).map((COLUMN_NAME) => ({ COLUMN_NAME })) };
       }
       if (sql.includes("NVL(MAX")) return { rows: [{ NEXT_ID: ++nextId }] };
-      if (sql.startsWith("SELECT header_id")) return { rows: headerRow ? [headerRow] : [] };
+      if (sql.startsWith("UPDATE invoice_header SET processing_status")) {
+        currentStatus = binds[0];
+        return { rowsAffected: 1 };
+      }
+      if (sql.startsWith("SELECT header_id")) {
+        return { rows: headerRow ? [{ ...headerRow, PROCESSING_STATUS: currentStatus }] : [] };
+      }
       if (sql.includes("FROM erp_invoice_queue")) return { rows: queueRows };
       return { rowsAffected: 1 };
     },
@@ -69,6 +76,21 @@ test("reject notifies without queuing for ERP", async () => {
   const note = connection.seen.find((s) => s.sql.startsWith("INSERT INTO NOTIFICATION"));
   assert.ok(note.binds.includes("INVOICE_REJECTED"));
   assert.equal(connection.seen.filter((s) => s.sql.startsWith("INSERT INTO ERP_INVOICE_QUEUE")).length, 0);
+});
+
+test("approve works on an exception invoice after review", async () => {
+  const connection = stubConnection({
+    headerRow: { HEADER_ID: 10, INVOICE_NUMBER: "INV-10", PROCESSING_STATUS: "Exception" },
+  });
+  const result = await recordReviewDecision(connection, {
+    headerId: 10,
+    decision: "approve",
+    remarks: "Reviewed: supplier confirmed by payables.",
+    actionBy: "payables.user",
+  });
+  assert.equal(result.oldStatus, "Exception");
+  assert.equal(result.newStatus, "Approved");
+  assert.equal(result.queued.status, "queued");
 });
 
 test("review decisions require remarks and a decidable header", async () => {

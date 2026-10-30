@@ -101,12 +101,16 @@ export function parseMuseInvoice(data = {}, fallback = {}) {
   const vendorName = str(
     pick(data, "VendorName", "vendor_name", "vendorName") || fallback.vendorName || "Unknown vendor",
   );
-  const amountDue = num(pick(data, "AmountDue", "InvoiceTotal", "amount_due", "amountDue"));
+  const rawAmount = pick(data, "AmountDue", "InvoiceTotal", "amount_due", "amountDue");
+  const parsedAmount = Number(rawAmount);
+  const amountValid = Number.isFinite(parsedAmount) && parsedAmount !== 0;
+  // Negative totals are valid credit memos and must survive normalization.
+  const amountDue = Number.isFinite(parsedAmount) ? parsedAmount : 0;
   const currency = pick(data, "Currency", "currency");
   const lowConfidence =
     !pick(data, "InvoiceId", "invoice_number", "invoiceNumber") ||
     !pick(data, "VendorName", "vendor_name", "vendorName") ||
-    !(amountDue > 0);
+    !amountValid;
   const notes = str(pick(data, "Notes", "notes") ?? "", 500);
   const purchaseOrder = str(pick(data, "PurchaseOrder", "purchase_order", "purchaseOrder") ?? "", 30);
   return {
@@ -117,6 +121,9 @@ export function parseMuseInvoice(data = {}, fallback = {}) {
     amountDue: amountDue > 0 ? amountDue : 0,
     currency: ["USD", "EUR", "GBP"].includes(currency) ? currency : "USD",
     projectNumber: str(pick(data, "ProjectNumber", "project_number", "projectNumber") ?? "", 30),
+    projectName: str(pick(data, "ProjectName", "project_name", "projectName") ?? "", 300),
+    supplierNumber: str(pick(data, "SupplierNumber", "supplier_number", "supplierNumber") ?? "", 30),
+    amountInvalid: !amountValid,
     jobNumber: str(pick(data, "Job", "job_number", "jobNumber") ?? "", 30),
     paymentTerms: str(pick(data, "PaymentTerm", "payment_terms", "paymentTerms") ?? "", 30),
     previousUnpaidBalance: num(pick(data, "PreviousUnpaidBalance", "previous_unpaid_balance"), 0) || null,

@@ -19,12 +19,13 @@ import { supplierFeed as sampleSupplierFeed, type SupplierFeedRecord } from "@/d
 import {
   createApprovalNotification,
   createDecisionNotification,
+  createUpdateNotification,
   describeInvoiceChanges,
   isApprovalTransition,
   type ApprovalNotification,
   type ChangeEntry,
 } from "@/lib/review";
-import { INVALID_SUPPLIER_PROJECT_REMARKS, validateInvoice } from "@/lib/validation";
+import { validateInvoice } from "@/lib/validation";
 
 const INVOICES_KEY = "sire-invoices-v1";
 const EDITED_KEY = "sire-edited-ids-v1";
@@ -93,7 +94,7 @@ export default function App() {
   const [detailOrigin, setDetailOrigin] = useState<DetailOrigin>("workbench");
   const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
-  const [engine, setEngine] = useState<ConversionEngine>("llama");
+  const [engine, setEngine] = useState<ConversionEngine>("react");
   const [dataMode, setDataMode] = useState<DataMode>(() =>
     load<string>(DATA_MODE_KEY, "sample") === "live" ? "live" : "sample",
   );
@@ -113,48 +114,42 @@ export default function App() {
     store(DATA_MODE_KEY, dataMode);
   }, [dataMode]);
 
+  const refreshLive = useCallback(async (fresh = false) => {
+    setLiveState({ kind: "loading" });
+    try {
+      const response = await fetch(fresh ? "/api/live/data?fresh=1" : "/api/live/data");
+      if (!response.ok) throw new Error(`Live data request failed (${response.status})`);
+      const data = await response.json();
+      if (!data.connected) {
+        setLiveState({
+          kind: "error",
+          message:
+            data.error ||
+            "Oracle did not connect. Check Connections and that npm run server is running.",
+        });
+        return;
+      }
+      setLiveState({
+        kind: "ready",
+        data: {
+          suppliers: data.suppliers || [],
+          projects: data.projects || [],
+          invoices: data.invoices || [],
+        },
+      });
+    } catch {
+      setLiveState({
+        kind: "error",
+        message:
+          "The backend is not reachable, so live Oracle data cannot be loaded. Start it with npm run server.",
+      });
+    }
+  }, []);
+
   useEffect(() => {
     if (!isLive) return;
-    let cancelled = false;
-    setLiveState({ kind: "loading" });
-    fetch("/api/live/data")
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`Live data request failed (${response.status})`);
-        return response.json();
-      })
-      .then((data) => {
-        if (cancelled) return;
-        if (!data.connected) {
-          setLiveState({
-            kind: "error",
-            message:
-              data.error ||
-              "Oracle did not connect. Check Connections and that npm run server is running.",
-          });
-          return;
-        }
-        setLiveState({
-          kind: "ready",
-          data: {
-            suppliers: data.suppliers || [],
-            projects: data.projects || [],
-            invoices: data.invoices || [],
-          },
-        });
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setLiveState({
-            kind: "error",
-            message:
-              "The backend is not reachable, so live Oracle data cannot be loaded. Start it with npm run server.",
-          });
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isLive]);
+    void refreshLive(false);
+  }, [isLive, refreshLive]);
 
   const changeDataMode = useCallback((mode: DataMode) => {
     setDataMode(mode);
@@ -263,9 +258,9 @@ export default function App() {
 
   const addInvoice = useCallback((invoice: Invoice) => {
     const validation = validateInvoice(invoice, sampleSupplierFeed, sampleProjectFeed);
-    const stored: Invoice =
-      validation.level === "invalid" ? { ...invoice, status: "Rejected" } : invoice;
-    setInvoiceRecords((records) => [stored, ...records]);
+    // Validation failures never auto-reject: the invoice stays as captured
+    // and the reviewer approves or rejects it from the detail screen.
+    setInvoiceRecords((records) => [invoice, ...records]);
     setChangeLog((log) => [
       {
         id: `${Date.now()}-${invoice.id}`,
@@ -276,7 +271,7 @@ export default function App() {
         changes: [
           `Manual upload created from ${invoice.fileName} (${invoice.filePath})`,
           ...(validation.level === "invalid"
-            ? [`Automatically rejected: ${INVALID_SUPPLIER_PROJECT_REMARKS}`]
+            ? [`Validation failed (${validation.issues.length} exception(s)): ${validation.issues.join(" ")} Needs review before approving or rejecting.`]
             : []),
           ...(validation.level === "review"
             ? ["Payables team review required before approving or rejecting (inactive supplier or project)"]
@@ -359,6 +354,96 @@ export default function App() {
           invoiceId: invoice.id,
           invoiceNumber: invoice.invoiceNumber,
           supplier: invoice.supplier,
+          at,
+          changes,
+        },
+        ...log,
+      ]);
+      return changes;
+    },
+    [],
+  );
+
+  const updateLiveInvoice = useCallback(
+    async (updated: Invoice, remarks: string): Promise<string[]> => {
+      const headerId = updated.id.startsWith("db-") ? Number(updated.id.slice(3)) : Number.NaN;
+      if (!Number.isInteger(headerId)) {
+        throw new Error("Only Oracle invoices can be updated in Live mode.");
+      }
+      let response: Response;
+      try {
+        response = await fetch("/api/invoices/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            headerId,
+            remarks,
+            fields: {
+              jobNumber: updated.jobNumber,
+              source: updated.source,
+              receivedDate: updated.receivedDate,
+              invoiceDate: updated.invoiceDate,
+              amount: updated.amount,
+              currency: updated.currency,
+              remittanceAddress: updated.remittanceAddress,
+              billToAddress: updated.billToAddress,
+              status: updated.status,
+              exceptionCount: updated.exceptionCount,
+              payablesReviewConfirmed: updated.payablesReviewConfirmed,
+              lines: updated.lines.map((line) => ({
+                description: line.description,
+                quantity: line.quantity,
+                units: line.units,
+                unitPrice: line.unitPrice,
+                amount: line.amount,
+              })),
+            },
+          }),
+        });
+      } catch {
+        throw new Error(
+          "The backend is not reachable. Start it with npm run server, then try again. Nothing was recorded in Oracle.",
+        );
+      }
+      const data = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        changes?: string[];
+        newStatus?: string;
+      };
+      if (!response.ok || !data.ok) {
+        throw new Error(data.error || `Oracle update failed (${response.status})`);
+      }
+      const at = new Date().toISOString();
+      const serverChanges = Array.isArray(data.changes) ? data.changes : [];
+      const saved: Invoice = { ...updated, status: (data.newStatus as Invoice["status"]) ?? updated.status };
+      setLiveState((state) =>
+        state.kind === "ready"
+          ? {
+              ...state,
+              data: {
+                ...state.data,
+                invoices: state.data.invoices.map((item) =>
+                  item.id === updated.id ? saved : item,
+                ),
+              },
+            }
+          : state,
+      );
+      const notification = createUpdateNotification(updated, remarks, at);
+      if (notification) {
+        setNotifications((items) => [notification, ...items]);
+      }
+      const changes = [
+        ...serverChanges,
+        `Notification to Payables Manager: "${remarks.trim()}"`,
+      ];
+      setChangeLog((log) => [
+        {
+          id: `${Date.now()}-${updated.id}`,
+          invoiceId: updated.id,
+          invoiceNumber: updated.invoiceNumber,
+          supplier: updated.supplier,
           at,
           changes,
         },
@@ -522,6 +607,7 @@ export default function App() {
               }
               onBack={() => setSelectedInvoiceId(null)}
               onSave={saveInvoice}
+              onUpdateLive={updateLiveInvoice}
               onApprove={approveInvoice}
               onReject={rejectInvoice}
             />
@@ -536,6 +622,8 @@ export default function App() {
               projectFeed={activeProjectFeed}
               onSelectInvoice={(invoice) => openInvoice(invoice, "workbench")}
               onAddInvoice={addInvoice}
+              onRefresh={() => refreshLive(true)}
+              onSynced={() => refreshLive(true)}
             />
           ) : activeSection.id === "actions" ? (
             <MyActions

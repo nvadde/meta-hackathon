@@ -80,13 +80,13 @@ export async function runReactPipeline(
 
 /**
  * Shared staged-PDF conversion honoring the Dashboard engine toggle.
- * "react" runs the validating agentic loop; anything else (or a react
- * failure) uses the direct llama extraction. Returns the draft plus the
- * engine that actually produced it.
+ * "react" (the default) runs the validating agentic loop; "llama" (or a
+ * react failure) uses the direct llama extraction. Returns the draft plus
+ * the engine that actually produced it.
  */
 export async function convertWithEngine(
   stagedBytes,
-  { filename, llamaSchemaText, emailContext = "", fallback = {}, engine = "llama", convertFn, modelFn, maxAttempts = 3 },
+  { filename, llamaSchemaText, emailContext = "", fallback = {}, engine = "react", convertFn, modelFn, maxAttempts = 3 },
 ) {
   if (engine === "react") {
     try {

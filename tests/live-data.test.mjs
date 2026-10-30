@@ -12,6 +12,7 @@ test("mapSupplierRow and mapProjectRow shape Oracle rows like the ERP feeds", ()
   assert.deepEqual(
     mapSupplierRow({
       SUPPLIER_NAME: "Atlas Concrete Ltd",
+      SUPPLIER_NUMBER: "SUP-101",
       STATUS: "Active",
       START_DATE: new Date("2023-02-01T00:00:00Z"),
       END_DATE: null,
@@ -20,6 +21,7 @@ test("mapSupplierRow and mapProjectRow shape Oracle rows like the ERP feeds", ()
     }),
     {
       supplier: "Atlas Concrete Ltd",
+      supplierNumber: "SUP-101",
       status: "Active",
       startDate: "2023-02-01",
       endDate: null,
@@ -74,6 +76,38 @@ test("mapInvoiceRows keeps the live source channel", () => {
   );
   assert.equal(one.source, "Gmail");
   assert.equal(two.source, "WhatsApp");
+});
+
+test("mapInvoiceRows reports the stored invoice type and re-derives exception messages", () => {
+  const masters = {
+    supplierRows: [{ SUPPLIER_NAME: "Atlas Concrete Ltd", SUPPLIER_NUMBER: "SUP-1" }],
+    projectRows: [{ PROJECT_NAME: "Riverside Tower", PROJECT_NUMBER: "PRJ-101" }],
+  };
+  const [matched, broken] = mapInvoiceRows(
+    [
+      {
+        HEADER_ID: 7, FILE_ID: 3, INVOICE_NUMBER: "INV-1",
+        SUPPLIER_NAME: "Atlas Concrete Ltd", SUPPLIER_NUMBER: "SUP-1",
+        PROJECT_NAME: "Riverside Tower", PROJECT_NUMBER: "PRJ-101",
+        INVOICE_SOURCE: "Gmail", AMOUNT_DUE: 300, INVOICE_CURRENCY: "USD",
+        INVOICE_TYPE: "Standard", PROCESSING_STATUS: "Matched", EXCEPTION_COUNT: 0,
+      },
+      {
+        HEADER_ID: 8, FILE_ID: 4, INVOICE_NUMBER: "",
+        SUPPLIER_NAME: "Ghost Ltd", PROJECT_NUMBER: "PRJ-999",
+        INVOICE_SOURCE: "Gmail", AMOUNT_DUE: 50, INVOICE_CURRENCY: "USD",
+        INVOICE_TYPE: "Credit memo", PROCESSING_STATUS: "Exception", EXCEPTION_COUNT: 3,
+      },
+    ],
+    [{ HEADER_ID: 7, LINE_NUM: "1", DESCRIPTION: "Concrete", QUANTITY: 2, UNITS: "m3", UNIT_PRICE: 150, AMOUNT: 300 }],
+    masters,
+  );
+  assert.equal(matched.invoiceType, "Standard");
+  assert.deepEqual(matched.exceptionMessages, []);
+  assert.equal(broken.invoiceType, "Credit memo");
+  assert.ok(broken.exceptionMessages.includes("Invoice number is blank."));
+  assert.ok(broken.exceptionMessages.some((message) => message.includes("Ghost Ltd")));
+  assert.ok(!broken.exceptionMessages.some((message) => message.includes("PRJ-999")));
 });
 
 test("mapInvoiceRows groups lines under headers and carries the file path", () => {

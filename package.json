@@ -17,7 +17,7 @@
     "erp:enqueue": "node scripts/erp-enqueue.mjs",
     "invoices:mark-ready": "node scripts/invoices-mark-ready.mjs",
     "agent:convert": "node agent/react-agent.mjs",
-    "test": "node --experimental-strip-types --test tests/invoice-pdf.test.mjs tests/react-agent.test.mjs tests/convert.test.mjs tests/whatsapp.test.mjs tests/erp-queue.test.mjs tests/readiness.test.mjs tests/review-decision.test.mjs tests/file-document.test.mjs tests/review.test.mjs tests/manual-upload.test.mjs tests/currency.test.mjs tests/suppliers.test.mjs tests/projects.test.mjs tests/validation.test.mjs tests/db-config.test.mjs tests/live-data.test.mjs tests/gmail-ingest.test.mjs tests/gmail-sync.test.mjs tests/gmail-client.test.mjs",
+    "test": "node --experimental-strip-types --test tests/invoice-pdf.test.mjs tests/react-agent.test.mjs tests/convert.test.mjs tests/whatsapp.test.mjs tests/erp-queue.test.mjs tests/readiness.test.mjs tests/review-decision.test.mjs tests/file-document.test.mjs tests/review.test.mjs tests/manual-upload.test.mjs tests/currency.test.mjs tests/suppliers.test.mjs tests/projects.test.mjs tests/validation.test.mjs tests/db-config.test.mjs tests/live-data.test.mjs tests/gmail-ingest.test.mjs tests/gmail-sync.test.mjs tests/gmail-client.test.mjs tests/invoice-validation.test.mjs tests/invoice-update.test.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },

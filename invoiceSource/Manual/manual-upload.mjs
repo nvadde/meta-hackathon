@@ -32,7 +32,7 @@ export function nextFileId(registry) {
 export async function insertManualFromConversion(
   connection,
   entry,
-  { mode, userFields, fileSizeBytes, schemaText, stagedBytes, maxAttempts = 3, convertFn, modelFn },
+  { mode, userFields, fileSizeBytes, schemaText, stagedBytes, maxAttempts = 3, convertFn, modelFn, auditFs, auditRoot },
 ) {
   if (mode !== "llama" && mode !== "react") {
     throw new Error(`insertManualFromConversion: mode must be 'llama' or 'react'.`);
@@ -66,7 +66,12 @@ export async function insertManualFromConversion(
       }
     }
   }
-  const stored = await insertManualInvoice(connection, entry, { ...effectiveFields, fileSizeBytes });
+  const stored = await insertManualInvoice(
+    connection,
+    entry,
+    { ...effectiveFields, fileSizeBytes },
+    { auditFs, auditRoot },
+  );
   return { stored, extracted: true, filledKeys, ...(attempts === undefined ? {} : { attempts }) };
 }
 
@@ -92,18 +97,24 @@ function finiteNumber(value) {
  * (for the already-stored PDF), one invoice_header row, and one invoice_lines
  * row from the form. Throws on invalid fields before touching the database.
  */
-export function insertManualInvoice(connection, entry, fields) {
-  return insertReceivedInvoice(connection, entry, fields, {
-    channel: "Manual Upload",
-    createdBy: "MANUAL_UPLOAD",
-  });
+export function insertManualInvoice(connection, entry, fields, deps = {}) {
+  return insertReceivedInvoice(
+    connection,
+    entry,
+    fields,
+    {
+      channel: "Manual Upload",
+      createdBy: "MANUAL_UPLOAD",
+    },
+    deps,
+  );
 }
 
 /**
  * Shared insert for every received channel (Gmail, Manual, WhatsApp):
  * one file_details row, one invoice_header row, one invoice_lines row.
  */
-export async function insertReceivedInvoice(connection, entry, fields, { channel, createdBy }) {
+export async function insertReceivedInvoice(connection, entry, fields, { channel, createdBy }, deps = {}) {
   const problems = [];
   if (!trimmed(fields.invoiceNumber)) problems.push("Invoice number is required.");
   if (!trimmed(fields.supplier)) problems.push("Supplier is required.");
@@ -171,5 +182,6 @@ export async function insertReceivedInvoice(connection, entry, fields, { channel
       createdBy,
       fallbackDescription: trimmed(fields.lineDescription) || draft.invoiceNumber,
     },
+    deps,
   );
 }

@@ -65,9 +65,57 @@ describe("gmail-sync", () => {
     assert.deepEqual(moved, ["m1"]);
   });
 
+  it("reports sync progress stages without breaking the import", async () => {
+    const events = [];
+    const deps = {
+      getAccessTokenFn: async () => "token",
+      ensureLabelFn: async () => "L1",
+      listMessagesFn: async () => ({ messages: [{ id: "m1" }] }),
+      gmailFn: async () => ({ payload: { headers: [], parts: [] } }),
+      getDbPoolFn: async () => ({
+        getConnection: async () => ({
+          execute: async () => ({ rows: [] }),
+          commit: async () => {},
+          rollback: async () => {},
+          close: async () => {},
+        }),
+      }),
+      markProcessedFn: async () => {},
+      importAttachmentFn: async () => ({ status: "imported" }),
+    };
+    const summary = await syncGmailInvoices(
+      { maxMessages: 5, onProgress: (event) => void events.push(event) },
+      deps,
+    );
+    assert.equal(summary.checked, 1);
+    const stages = events.map((event) => event.stage);
+    assert.ok(stages.includes("reading"));
+    assert.ok(stages.includes("done"));
+    assert.ok(events.every((event) => typeof event.at === "string"));
+
+    const failing = [];
+    const resilient = await syncGmailInvoices(
+      {
+        maxMessages: 5,
+        onProgress: (event) => {
+          failing.push(event);
+          throw new Error("listener boom");
+        },
+      },
+      deps,
+    );
+    assert.equal(resilient.checked, 1);
+    assert.ok(failing.length > 0);
+  });
+
   it("stages a folder PDF, converts it, and inserts file/header/lines", async () => {
     const stagedName = "test-import-buffer.pdf";
     const writtenFiles = new Map();
+    const auditFiles = new Map();
+    const auditFs = {
+      mkdir: async () => {},
+      writeFile: async (filePath, data) => void auditFiles.set(filePath, data),
+    };
     const fakeBuffer = Buffer.from("%PDF-1.4 fake");
     let nextIdValue = 40;
     const statements = [];
@@ -115,9 +163,15 @@ describe("gmail-sync", () => {
           assert.ok(writtenFiles.has(filePath), "convert reads the staged file");
           return writtenFiles.get(filePath);
         },
+        auditFs,
+        auditRoot: "/tmp/sire-audit",
       },
     );
     assert.equal(result.status, "imported");
+    assert.equal(auditFiles.size, 1);
+    const [[auditPath, auditData]] = [...auditFiles.entries()];
+    assert.match(auditPath, /Manual[\\/]test-import-buffer-\d{4}-\d{2}-\d{2}T.*\.json$/);
+    assert.equal(JSON.parse(auditData).draft.invoiceNumber, "INV-9");
     assert.equal(
       statements.filter((sql) => sql.startsWith("INSERT INTO INVOICE_LINES")).length,
       2,
@@ -130,6 +184,11 @@ describe("gmail-sync", () => {
 
   it("importPdfBuffer honors the ReAct engine toggle", async () => {
     const writtenFiles = new Map();
+    const auditFiles = new Map();
+    const auditFs = {
+      mkdir: async () => {},
+      writeFile: async (filePath, data) => void auditFiles.set(filePath, data),
+    };
     const modelJson = JSON.stringify({
       InvoiceId: "844707",
       VendorName: "KATH FUEL OIL SERVICE CO",
@@ -170,12 +229,71 @@ describe("gmail-sync", () => {
         mkdirFn: async () => {},
         writeFileFn: async (filePath, data) => void writtenFiles.set(filePath, data),
         readFileFn: async (filePath) => writtenFiles.get(filePath),
+        auditFs,
+        auditRoot: "/tmp/sire-audit",
       },
     );
     assert.equal(result.status, "imported");
     assert.equal(result.engine, "react");
+    assert.equal(auditFiles.size, 1);
+    assert.match([...auditFiles.keys()][0], /Manual[\\/]a-\d{4}-\d{2}-\d{2}T.*\.json$/);
     const headerInsert = statements.find((entry) => entry.sql.includes("INSERT INTO INVOICE_HEADER"));
     assert.ok(headerInsert.binds.includes("844707"));
+  });
+
+  it("importPdfBuffer works without an injected convertFn (default converter resolves)", async () => {
+    const writtenFiles = new Map();
+    const auditFiles = new Map();
+    const auditFs = {
+      mkdir: async () => {},
+      writeFile: async (filePath, data) => void auditFiles.set(filePath, data),
+    };
+    const modelJson = JSON.stringify({
+      InvoiceId: "844709",
+      VendorName: "KATH FUEL OIL SERVICE CO",
+      InvoiceDate: "2026-01-22",
+      AmountDue: 200,
+      Currency: "USD",
+      Items: [
+        { Description: "A", Quantity: 1, Unit: "ea", Amount: 200 },
+      ],
+    });
+    let nextIdValue = 80;
+    const statements = [];
+    const allColumns = (names) => ({ rows: names.map((COLUMN_NAME) => ({ COLUMN_NAME })) });
+    const fullColumns = {
+      FILE_DETAILS: ["FILE_ID", "FILE_NAME", "ORIGINAL_FILE_NAME", "FILE_PATH", "FILE_SIZE_BYTES", "MIME_TYPE", "SOURCE_CHANNEL", "MESSAGE_ID", "STATUS", "CREATION_DATE", "CREATED_BY"],
+      INVOICE_HEADER: ["HEADER_ID", "FILE_ID", "INVOICE_NUMBER", "VENDOR_NAME", "SUPPLIER_NAME", "INVOICE_DATE", "RECEIVED_DATE", "AMOUNT_DUE", "INVOICE_CURRENCY", "INVOICE_SOURCE", "PROCESSING_STATUS", "EXCEPTION_COUNT", "PROJECT_NUMBER", "JOB_NUMBER", "BILLING_ADDRESS", "BILLING_ADDRESS_RECIPIENT", "CUSTOMER_ADDRESS", "CUSTOMER_ADDRESS_RECIPIENT", "REMITTANCE_ADDRESS", "REMITTANCE_ADDRESS_RECIPIENT", "SHIPPING_ADDRESS", "SHIPPING_ADDRESS_RECIPIENT", "SHIPPING_COST", "DUE_DATE", "PAYMENT_TERMS", "PREVIOUS_UNPAID_BALANCE", "TOTAL_TAX", "TOTAL_VAT", "VENDOR_ADDRESS", "CREATION_DATE", "CREATED_BY"],
+      INVOICE_LINES: ["LINE_ID", "HEADER_ID", "LINE_NUM", "NAME", "PRODUCT_CODE", "DESCRIPTION", "QUANTITY", "UNITS", "UNIT_PRICE", "AMOUNT", "CREATION_DATE", "CREATED_BY"],
+    };
+    const connection = {
+      execute: async (sql, binds) => {
+        statements.push({ sql, binds });
+        if (sql.includes("user_tab_columns")) return allColumns(fullColumns[binds[0]]);
+        if (sql.includes("NVL(MAX")) return { rows: [{ NEXT_ID: ++nextIdValue }] };
+        if (sql.includes("FROM file_details WHERE file_id")) return { rows: [{ FILE_ID: 81 }] };
+        return { rowsAffected: 1 };
+      },
+    };
+    const result = await importPdfBuffer(
+      connection,
+      { buffer: Buffer.from("%PDF-1.4 fake"), originalName: "inv-2041.pdf", stagedName: "gmail-1-inv-2041.pdf", mode: "react" },
+      {
+        modelFn: async () => modelJson,
+        schemaTextFn: async () => "{}",
+        stagingDir: "/tmp/sire-test",
+        mkdirFn: async () => {},
+        writeFileFn: async (filePath, data) => void writtenFiles.set(filePath, data),
+        readFileFn: async (filePath) => writtenFiles.get(filePath),
+        auditFs,
+        auditRoot: "/tmp/sire-audit",
+      },
+    );
+    assert.equal(result.status, "imported");
+    assert.equal(result.engine, "react");
+    assert.match(result.auditFile, /^Manual\/inv-2041-\d{4}-\d{2}-\d{2}T.*\.json$/);
+    const headerInsert = statements.find((entry) => entry.sql.includes("INSERT INTO INVOICE_HEADER"));
+    assert.ok(headerInsert.binds.includes("844709"));
   });
 
   it("inserts the full muse.ai field set into header and lines", async () => {
@@ -218,6 +336,7 @@ describe("gmail-sync", () => {
         return { rowsAffected: 1 };
       },
     };
+    const auditFiles = new Map();
     const stored = await insertDraft(
       connection,
       draft,
@@ -231,8 +350,16 @@ describe("gmail-sync", () => {
         createdBy: "FILE_SYNC",
         fallbackDescription: "844708",
       },
+      {
+        auditFs: {
+          mkdir: async () => {},
+          writeFile: async (filePath, data) => void auditFiles.set(filePath, data),
+        },
+        auditRoot: "/tmp/sire-audit",
+      },
     );
     assert.equal(stored.status, "imported");
+    assert.match(stored.auditFile, /^Manual\/inv-\d{4}-\d{2}-\d{2}T.*\.json$/);
     assert.equal(stored.fileId, 101);
     assert.equal(stored.headerId, 7);
     assert.equal(stored.lineCount, 1);
@@ -241,9 +368,9 @@ describe("gmail-sync", () => {
     assert.match(header.sql, /PAYMENT_TERMS/);
     assert.ok(header.binds.includes("FILE_SYNC"));
     assert.ok(header.binds.includes("Manual Upload"));
-    assert.equal(header.binds[2], "844708");
-    assert.equal(header.binds[14], "BOX 1333");
-    assert.equal(header.binds[24], "15TH OF FOLLOWING MO");
+    assert.ok(header.binds.includes("844708"));
+    assert.ok(header.binds.includes("BOX 1333"));
+    assert.ok(header.binds.includes("15TH OF FOLLOWING MO"));
     const line = seen.find((s) => s.sql.includes("INSERT INTO INVOICE_LINES"));
     assert.match(line.sql, /PRODUCT_CODE/);
     assert.equal(line.binds[4], "913");

@@ -24,20 +24,51 @@ type LoadState =
   | { kind: "ready"; data: GmailStatus }
   | { kind: "unavailable" };
 
+interface SyncProgress {
+  stage: "idle" | "reading" | "converting" | "inserting" | "done" | "error";
+  detail?: string;
+  file?: string;
+  at?: string | null;
+}
+
+const SYNC_STEPS = [
+  "Reading emails from Gmail",
+  "Converting PDF to JSON",
+  "Inserting into Oracle",
+  "Showing on dashboard",
+] as const;
+
 export function SourceConnections({
   engine,
   onUpload,
+  onSynced,
 }: {
   engine: "llama" | "react";
   onUpload: () => void;
+  onSynced?: () => Promise<unknown> | unknown;
 }) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [progress, setProgress] = useState<SyncProgress>({ stage: "idle" });
+  const [dashboardShown, setDashboardShown] = useState(false);
+
+  async function pollProgress() {
+    try {
+      const response = await fetch("/api/sources/gmail/sync/progress");
+      const data = await response.json();
+      if (data?.progress) setProgress(data.progress as SyncProgress);
+    } catch {
+      // Progress polling is best-effort; the sync result carries the outcome.
+    }
+  }
 
   async function syncGmailToOracle() {
     setSyncing(true);
     setSyncMessage(null);
+    setDashboardShown(false);
+    setProgress({ stage: "reading", detail: "Sync started." });
+    const timer = window.setInterval(pollProgress, 1500);
     try {
       const response = await fetch("/api/sources/gmail/sync", {
         method: "POST",
@@ -46,18 +77,28 @@ export function SourceConnections({
       });
       const data = await response.json();
       if (!response.ok || data.ok === false) throw new Error(data.error || "Sync failed");
+      await pollProgress();
+      await onSynced?.();
+      setDashboardShown(true);
       const notes = (data.notes || []).join("; ");
+      const errors = (data.errors || []).join("; ");
       setSyncMessage(
         `Sync done (${engine === "react" ? "ReAct" : "Llama"}): ${data.imported} imported, ${data.skipped} skipped, ${data.checked} checked.` +
-          (data.errors?.length ? ` Errors: ${data.errors.length}.` : " Switch the header toggle to Live to review them.") +
+          (errors ? ` Errors: ${errors}` : " Switch the header toggle to Live to review them.") +
           (notes ? ` Notes: ${notes}` : ""),
       );
     } catch (error) {
+      await pollProgress();
       setSyncMessage(error instanceof Error ? error.message : "Sync failed.");
     } finally {
+      window.clearInterval(timer);
       setSyncing(false);
     }
   }
+
+  const activeStep =
+    progress.stage === "converting" ? 1 : progress.stage === "inserting" ? 2 : progress.stage === "done" ? 3 : 0;
+  const finishedStep = progress.stage === "done" && dashboardShown ? SYNC_STEPS.length : activeStep;
 
   useEffect(() => {
     let cancelled = false;
@@ -129,6 +170,35 @@ export function SourceConnections({
                 {syncing ? "Syncing…" : "Sync to Oracle"}
               </button>
             </div>
+            {(syncing || progress.stage === "done" || progress.stage === "error") &&
+              progress.stage !== "idle" && (
+                <ol className="mt-2 space-y-1 text-sm" aria-live="polite">
+                  {SYNC_STEPS.map((label, index) => {
+                    const done = index < finishedStep;
+                    const active = index === finishedStep && syncing;
+                    return (
+                      <li key={label} className="flex items-center gap-2">
+                        {done ? (
+                          <CheckCircle2 aria-hidden="true" className="h-4 w-4 shrink-0 text-teal-dark dark:text-teal" />
+                        ) : active ? (
+                          <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-teal-dark dark:text-teal" />
+                        ) : (
+                          <span aria-hidden="true" className="grid h-4 w-4 shrink-0 place-items-center">
+                            <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                          </span>
+                        )}
+                        <span className={done || active ? "text-foreground" : "text-muted-foreground"}>
+                          {label}
+                          {active && progress.detail ? ` — ${progress.detail}` : ""}
+                        </span>
+                      </li>
+                    );
+                  })}
+                  {progress.stage === "error" && progress.detail && (
+                    <li className="text-sm text-red-700 dark:text-red-300">Sync failed: {progress.detail}</li>
+                  )}
+                </ol>
+              )}
             {syncMessage && <p className="mt-1 text-sm text-muted-foreground">{syncMessage}</p>}
           </div>
         )}

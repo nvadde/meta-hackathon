@@ -371,13 +371,6 @@ export function InvoiceTable({
                       ))}
                       {(() => {
                         const validation = validateInvoice(invoice, supplierFeed, projectFeed);
-                        if (validation.level === "invalid") {
-                          return (
-                            <Badge className="ml-2 bg-red-600 text-white hover:bg-red-600">
-                              Invalid supplier/project — reject
-                            </Badge>
-                          );
-                        }
                         if (validation.level === "review" && !invoice.payablesReviewConfirmed) {
                           return (
                             <Badge

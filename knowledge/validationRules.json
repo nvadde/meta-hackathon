@@ -1,0 +1,72 @@
+{
+  "version": "1.0",
+  "description": "SIRE invoice validation rules. Extraction refers to invoiceSchema.json to know which fields to pull from a PDF; once a normalized draft exists, validation refers to this file to decide the invoice type, the processing status, and the exception messages. All ingest channels (Gmail, WhatsApp, Manual Upload) share these rules.",
+  "sources": ["Gmail", "WhatsApp", "Manual Upload"],
+  "capture": {
+    "rule": "Every invoice is captured and loaded into the tables, even when validation fails.",
+    "autoReject": false
+  },
+  "invoiceType": {
+    "default": "Standard",
+    "creditMemoWhenAmountNegative": "Credit memo"
+  },
+  "status": {
+    "initial": "Received",
+    "onValidationPass": "Matched",
+    "then": "Ready (promoted by the readiness job when the supplier/project are active and lines reconcile)",
+    "onValidationFail": "Exception"
+  },
+  "exceptions": {
+    "count": "number of failed checks",
+    "storeMessages": true
+  },
+  "linesTolerance": {
+    "absolute": 1,
+    "relative": 0.01,
+    "rule": "sum(line amounts) must be within max(absolute, relative * |header total|) of the header total"
+  },
+  "checks": [
+    {
+      "id": "invoice-number-present",
+      "field": "invoiceNumber",
+      "test": "nonBlank",
+      "message": "Invoice number is blank."
+    },
+    {
+      "id": "supplier-present",
+      "field": "vendorName",
+      "test": "nonBlank",
+      "message": "Supplier is blank."
+    },
+    {
+      "id": "amount-valid",
+      "field": "amountDue",
+      "test": "nonZeroNumber",
+      "message": "Amount due is not a valid non-zero number."
+    },
+    {
+      "id": "supplier-match",
+      "field": "vendorName",
+      "test": "matchesSupplierMasterByName",
+      "message": "Supplier \"{value}\" does not match any supplier in the ERP feed."
+    },
+    {
+      "id": "duplicate-invoice",
+      "field": "invoiceNumber",
+      "test": "uniquePerSupplierWhilePending",
+      "message": "Duplicate invoice \"{value}\": the same supplier already has this invoice number on an invoice that is not Ready or Approved."
+    },
+    {
+      "id": "lines-numeric",
+      "field": "lines[].amount",
+      "test": "allNumeric",
+      "message": "A line amount is not numeric."
+    },
+    {
+      "id": "lines-reconcile",
+      "field": "amountDue vs sum(lines[].amount)",
+      "test": "withinLinesTolerance",
+      "message": "Invoice header amount {header} does not match the lines total {lines}."
+    }
+  ]
+}

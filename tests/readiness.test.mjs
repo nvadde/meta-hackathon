@@ -30,6 +30,7 @@ function stubConnection() {
         return {
           rows: [
             { HEADER_ID: 1, LINE_TOTAL: 100 },
+            { HEADER_ID: 4, LINE_TOTAL: 100 },
             { HEADER_ID: 5, LINE_TOTAL: 90 },
           ],
         };
@@ -51,9 +52,10 @@ function stubConnection() {
 test("markReadyInvoices promotes only fully qualifying headers", async () => {
   const connection = stubConnection();
   const result = await markReadyInvoices(connection, { createdBy: "SIRE" });
-  assert.deepEqual(result.marked.map((m) => m.headerId), [1]);
+  // Header 4 has an unknown project but qualifies: project is not a condition.
+  assert.deepEqual(result.marked.map((m) => m.headerId), [1, 4]);
   const updates = connection.seen.filter((s) => s.sql.startsWith("UPDATE invoice_header"));
-  assert.equal(updates.length, 1);
+  assert.equal(updates.length, 2);
   assert.ok(updates[0].sql.includes("'Ready'"));
   const action = connection.seen.find((s) => s.sql.startsWith("INSERT INTO INVOICE_REVIEW_ACTION"));
   assert.ok(action);

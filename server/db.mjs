@@ -41,6 +41,10 @@ export function getDbPool(env = process.env) {
       poolMin: 1,
       poolMax: 4,
       poolIncrement: 1,
+      // Drop dead idle connections promptly (ADB sleep kills them) and
+      // fail fast instead of hanging the dashboard when Oracle is down.
+      poolPingInterval: 30,
+      queueTimeout: 30000,
     });
     // A failed pool creation should not poison later retries.
     poolPromise.catch(() => {
@@ -48,6 +52,21 @@ export function getDbPool(env = process.env) {
     });
   }
   return poolPromise;
+}
+
+/**
+ * Open the pool (and one connection) eagerly so the first dashboard load
+ * does not pay the wallet dial + ADB wake cost. Fire-and-forget: startup
+ * never waits on Oracle.
+ */
+export function warmDbPool(env = process.env) {
+  getDbPool(env)
+    .then((pool) => pool.getConnection())
+    .then((connection) => connection.close())
+    .then(() => console.log("SIRE Oracle pool warmed."))
+    .catch((error) => {
+      console.warn(`SIRE Oracle pool warm-up failed: ${String(error?.message || error)}`);
+    });
 }
 
 export async function getDbStatus(env = process.env) {
@@ -121,13 +140,15 @@ export async function getDbStatus(env = process.env) {
  */
 export async function getLiveData(env = process.env) {
   let connection;
+  const started = Date.now();
+  const elapsed = () => Date.now() - started;
   try {
     const pool = await getDbPool(env);
     connection = await pool.getConnection();
     const options = { outFormat: oracledb.OUT_FORMAT_OBJECT };
 
     const supplierResult = await connection.execute(
-      `SELECT supplier_name, status, start_date, end_date, supplier_site, supplier_address
+      `SELECT supplier_name, supplier_number, status, start_date, end_date, supplier_site, supplier_address
          FROM supplier_master ORDER BY supplier_name`,
       [],
       options,
@@ -140,10 +161,10 @@ export async function getLiveData(env = process.env) {
     );
     const headerResult = await connection.execute(
       `SELECT h.header_id, h.file_id, f.file_name, f.file_path,
-              h.invoice_number, h.supplier_name, h.vendor_name,
+              h.invoice_number, h.supplier_name, h.supplier_number, h.vendor_name,
               p.project_name, h.project_number, h.job_number,
               h.invoice_source, h.received_date, h.invoice_date,
-              h.amount_due, h.invoice_currency, h.processing_status,
+              h.amount_due, h.invoice_currency, h.processing_status, h.invoice_type,
               h.remittance_address, h.customer_address AS bill_to,
               h.exception_count, h.payables_review_confirmed
          FROM invoice_header h
@@ -165,12 +186,21 @@ export async function getLiveData(env = process.env) {
       );
       lineRows = lineResult.rows || [];
     }
+    const mapped = mapInvoiceRows(headerResult.rows || [], lineRows, {
+      supplierRows: supplierResult.rows || [],
+      projectRows: projectResult.rows || [],
+    });
+    console.log(
+      `SIRE live data: ${(supplierResult.rows || []).length} suppliers, ` +
+        `${(projectResult.rows || []).length} projects, ${mapped.length} invoices ` +
+        `in ${elapsed()}ms.`,
+    );
 
     return {
       connected: true,
       suppliers: (supplierResult.rows || []).map(mapSupplierRow),
       projects: (projectResult.rows || []).map(mapProjectRow),
-      invoices: mapInvoiceRows(headerResult.rows || [], lineRows),
+      invoices: mapped,
     };
   } catch (error) {
     return {

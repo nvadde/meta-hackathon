@@ -26,7 +26,7 @@ export interface ApprovalNotification {
   invoiceNumber: string;
   supplier: string;
   to: "Payables Manager";
-  type: "Invoice approved" | "Invoice rejected";
+  type: "Invoice approved" | "Invoice rejected" | "Invoice updated";
   remarks: string;
   at: string;
   read: boolean;
@@ -57,6 +57,30 @@ export function createDecisionNotification(
     supplier: invoice.supplier,
     to: APPROVAL_RECIPIENT,
     type: decision === "approved" ? "Invoice approved" : "Invoice rejected",
+    remarks: trimmed,
+    at,
+    read: false,
+  };
+}
+
+/**
+ * Builds the Payables Manager notification for a live edit.
+ * Remarks/comments are mandatory: blank remarks return null.
+ */
+export function createUpdateNotification(
+  invoice: Invoice,
+  remarks: string,
+  at: string,
+): ApprovalNotification | null {
+  const trimmed = remarks.trim();
+  if (!trimmed) return null;
+  return {
+    id: `${at}-${invoice.id}-updated`,
+    invoiceId: invoice.id,
+    invoiceNumber: invoice.invoiceNumber,
+    supplier: invoice.supplier,
+    to: APPROVAL_RECIPIENT,
+    type: "Invoice updated",
     remarks: trimmed,
     at,
     read: false,

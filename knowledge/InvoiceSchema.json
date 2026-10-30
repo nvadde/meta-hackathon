@@ -41,7 +41,7 @@
     },
     {
         "key": "InvoiceNumber",
-        "description": "Unique invoice number or identifier."
+        "description": "invoice number or Invoice No. or Invoice# assigned to the invoice for tracking and reference."
     },
     {
         "key": "InvoiceTotal",
@@ -111,9 +111,17 @@
         "key": "VendorTaxId",
         "description": "Tax identification number of the vendor."
     },
+     {
+        "key": "ProjectName",
+        "description": "Name of the project referenced by the invoice."
+    },
+    {
+        "key": "ProjectNumber",
+        "description": "Number of the project referenced by the invoice."
+    },
     {
         "key": "Job",
-        "description": "Job, project, or work order referenced by the invoice."
+        "description": "Job or work order referenced by the invoice."
     },
     {
         "key": "RetDelFee",

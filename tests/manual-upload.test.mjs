@@ -66,10 +66,28 @@ function stubConnection() {
       }
       if (sql.includes("NVL(MAX")) return { rows: [{ NEXT_ID: ++nextId }] };
       if (sql.includes("FROM file_details WHERE file_id")) return { rows: [{ FILE_ID: 42 }] };
+      if (sql.includes("FROM supplier_master")) {
+        return { rows: [{ SUPPLIER_ID: 11, SUPPLIER_NUMBER: "SUP-T1", SUPPLIER_NAME: "Test Supplier" }] };
+      }
+      if (sql.includes("FROM project_master")) {
+        return { rows: [{ PROJECT_ID: 22, PROJECT_NUMBER: "PRJ-1", PROJECT_NAME: "Test Project" }] };
+      }
       return { rowsAffected: 1 };
     },
   };
   return connection;
+}
+
+function auditStub() {
+  const files = new Map();
+  return {
+    files,
+    fs: {
+      mkdir: async () => {},
+      writeFile: async (filePath, data) => void files.set(filePath, data),
+    },
+    root: "/tmp/sire-audit",
+  };
 }
 
 const manualFields = {
@@ -92,12 +110,20 @@ const manualFields = {
 
 test("insertManualInvoice writes file_details, header and one line", async () => {
   const connection = stubConnection();
+  const audit = auditStub();
   const result = await insertManualInvoice(
     connection,
     { file_id: 42, file_name: "manual-1-a.pdf", file_path: "files/Manual/manual-1-a.pdf" },
     { ...manualFields, fileSizeBytes: 1234 },
+    { auditFs: audit.fs, auditRoot: audit.root },
   );
   assert.equal(result.status, "imported");
+  assert.match(result.auditFile, /^Manual\/manual-1-a-\d{4}-\d{2}-\d{2}T.*\.json$/);
+  assert.equal(audit.files.size, 1);
+  assert.equal(JSON.parse([...audit.files.values()][0]).processingStatus, "Matched");
+  assert.equal(result.processingStatus, "Matched");
+  assert.equal(result.invoiceType, "Standard");
+  assert.deepEqual(result.exceptionMessages, []);
   const inserts = connection.seen.filter((s) => s.sql.startsWith("INSERT INTO"));
   assert.deepEqual(
     inserts.map((s) => s.sql.match(/INSERT INTO (\w+)/)[1]),
@@ -124,6 +150,7 @@ const EXTRACT_JSON = JSON.stringify({
 
 test("insertManualFromConversion llama mode fills blanks then inserts", async () => {
   const connection = stubConnection();
+  const audit = auditStub();
   const result = await insertManualFromConversion(
     connection,
     { file_id: 44, file_name: "manual-1.pdf", file_path: "files/Manual/manual-1.pdf" },
@@ -134,6 +161,8 @@ test("insertManualFromConversion llama mode fills blanks then inserts", async ()
       schemaText: "{}",
       stagedBytes: Buffer.from("%PDF-"),
       convertFn: async () => EXTRACT_JSON,
+      auditFs: audit.fs,
+      auditRoot: audit.root,
     },
   );
   assert.equal(result.stored.status, "imported");
@@ -145,6 +174,7 @@ test("insertManualFromConversion llama mode fills blanks then inserts", async ()
 
 test("insertManualFromConversion react mode validates then inserts", async () => {
   const connection = stubConnection();
+  const audit = auditStub();
   const result = await insertManualFromConversion(
     connection,
     { file_id: 45, file_name: "manual-2.pdf", file_path: "files/Manual/manual-2.pdf" },
@@ -155,8 +185,12 @@ test("insertManualFromConversion react mode validates then inserts", async () =>
       schemaText: "[]",
       stagedBytes: Buffer.from("%PDF-"),
       modelFn: async () => EXTRACT_JSON,
+      auditFs: audit.fs,
+      auditRoot: audit.root,
     },
   );
+  assert.equal(audit.files.size, 1);
+  assert.match([...audit.files.keys()][0], /Manual[\\/]manual-2-\d{4}-\d{2}-\d{2}T.*\.json$/);
   assert.equal(result.stored.status, "imported");
   assert.equal(result.attempts, 1);
   assert.ok(result.filledKeys.includes("supplier"));
@@ -190,15 +224,20 @@ test("insertManualInvoice rejects invalid fields without touching the db", async
   assert.equal(connection.seen.length, 0);
 });
 
-test("whatsapp channel inserts with its own source and low-confidence exception", async () => {
+test("whatsapp channel inserts unknown suppliers as exceptions with messages", async () => {
   const connection = stubConnection();
+  const audit = auditStub();
   const result = await insertReceivedInvoice(
     connection,
     { file_id: 43, file_name: "whatsapp-1-a.pdf", file_path: "files/Whatsapp/whatsapp-1-a.pdf" },
-    { ...manualFields, invoiceNumber: "WA-001", lowConfidence: true },
+    { ...manualFields, invoiceNumber: "WA-001", supplier: "Unknown Vendor", lowConfidence: true },
     { channel: "WhatsApp", createdBy: "WHATSAPP_SYNC" },
+    { auditFs: audit.fs, auditRoot: audit.root },
   );
+  assert.match(result.auditFile, /^WhatsApp\/whatsapp-1-a-\d{4}-\d{2}-\d{2}T.*\.json$/);
   assert.equal(result.status, "imported");
+  assert.equal(result.processingStatus, "Exception");
+  assert.ok(result.exceptionMessages.some((message) => message.includes("Unknown Vendor")));
   const header = connection.seen.find((s) => s.sql.startsWith("INSERT INTO INVOICE_HEADER"));
   assert.ok(header.binds.includes("WhatsApp"));
   assert.ok(header.binds.includes("Exception"));

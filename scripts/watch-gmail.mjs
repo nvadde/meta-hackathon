@@ -1,7 +1,7 @@
 /**
  * Watch loop: poll Gmail for new PDF invoices and import them into Oracle.
  *
- * Run: npm run watch:gmail [-- --interval 60 --max 5 --label "SIRE/Processed" --mode react]
+ * Run: npm run watch:gmail [-- --interval 60 --max 5 --label "SIRE/Processed" --mode llama]
  *
  * Each pass runs the same sync as POST /api/sources/gmail/sync: new PDF
  * invoices are extracted with Muse Spark, inserted into Oracle, and moved
@@ -27,7 +27,7 @@ function flagValue(name, fallback) {
 const intervalSeconds = Math.max(15, Number(flagValue("--interval", "60")) || 60);
 const maxMessages = Number(flagValue("--max", "5")) || 5;
 const processedLabel = flagValue("--label", "SIRE/Processed");
-const engineMode = flagValue("--mode", "llama") === "react" ? "react" : "llama";
+const engineMode = flagValue("--mode", "react") === "llama" ? "llama" : "react";
 
 const { syncGmailInvoices } = await import("../invoiceSource/Gmail/gmail-sync.mjs");
 const { closeDbPool } = await import("../server/db.mjs");

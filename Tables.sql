@@ -73,6 +73,9 @@ INSERT INTO code_lov (lov_id, lov_type, code, display_name, sort_order)
 VALUES (18, 'PROCESSING_STATUS', 'Success', 'Invoice created', 8);
 INSERT INTO code_lov (lov_id, lov_type, code, display_name, sort_order)
 VALUES (19, 'PROCESSING_STATUS', 'Failed', 'Failed to create Invoice', 9);
+INSERT INTO code_lov (lov_id, lov_type, code, display_name, sort_order)
+VALUES (20, 'PROCESSING_STATUS', 'Duplicate', 'Duplicate', 10);
+
 
 -- -----------------------------------------------------------------------------
 -- ERP feed: suppliers (Suppliers screen)
@@ -165,7 +168,7 @@ CREATE TABLE invoice_header (
     customer_address             VARCHAR2(300),  -- shown as Bill To address
     customer_address_recipient   VARCHAR2(300),
     invoice_source               VARCHAR2(30),   -- code_lov INVOICE_SOURCE
-    invoice_type                 VARCHAR2(30),   -- Invoice / Credit Memo / Debit Memo
+    invoice_type                 VARCHAR2(30),   -- Standard / Credit memo (negative totals)
     invoice_number               VARCHAR2(30),
     invoice_date                 DATE,
     received_date                DATE,
@@ -371,10 +374,9 @@ VALUES (3, 'GBP', 1.27, SYSDATE, 'Y', 'SAMPLE');
 -- -----------------------------------------------------------------------------
 -- Indexes for the screens' common lookups
 -- -----------------------------------------------------------------------------
-CREATE INDEX ix_header_supplier ON invoice_header ( supplier_id );
-CREATE INDEX ix_header_project ON invoice_header ( project_id );
+
 CREATE INDEX ix_header_status ON invoice_header ( processing_status );
-CREATE INDEX ix_header_invoice_number ON invoice_header ( invoice_number );
+
 CREATE INDEX ix_header_received_date ON invoice_header ( received_date );
 CREATE INDEX ix_lines_header ON invoice_lines ( header_id );
 CREATE INDEX ix_action_header ON invoice_review_action ( header_id );

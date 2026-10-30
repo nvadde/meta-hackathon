@@ -1,4 +1,5 @@
 /** Mapping from Oracle rows (uppercase keys) to the app's data shapes. */
+import { validateInvoiceDraft } from "../invoiceSource/invoice-validation.mjs";
 
 function toIsoDate(value) {
   if (!value) return "";
@@ -13,6 +14,7 @@ function orNull(value) {
 export function mapSupplierRow(row) {
   return {
     supplier: row.SUPPLIER_NAME ?? "",
+    supplierNumber: row.SUPPLIER_NUMBER ?? "",
     status: row.STATUS === "Inactive" ? "Inactive" : "Active",
     startDate: toIsoDate(row.START_DATE),
     endDate: orNull(row.END_DATE),
@@ -61,7 +63,48 @@ const KNOWN_STATUSES = new Set([
   "Rejected",
 ]);
 
-export function mapInvoiceRows(headerRows, lineRows) {
+export function invoiceTypeOf(value) {
+  return String(value ?? "").trim().toLowerCase() === "credit memo" ? "Credit memo" : "Standard";
+}
+
+/**
+ * Re-derive validation messages for stored rows (no schema change):
+ * masters are raw supplier_master/project_master rows. Without masters
+ * the list stays empty and only the stored type is reported.
+ */
+export function exceptionMessagesFor(row, lines, masters = null, opts = {}) {
+  if (!masters) return [];
+  const draft = {
+    invoiceNumber: row.INVOICE_NUMBER ?? "",
+    vendorName: row.SUPPLIER_NAME ?? row.VENDOR_NAME ?? "",
+    supplierNumber: row.SUPPLIER_NUMBER ?? "",
+    amountDue: row.AMOUNT_DUE,
+    amountInvalid: row.AMOUNT_DUE === null || row.AMOUNT_DUE === undefined,
+    projectNumber: row.PROJECT_NUMBER ?? "",
+    projectName: row.PROJECT_NAME ?? "",
+    lines: (lines || []).map((line) => ({ amount: line.AMOUNT })),
+  };
+  const supplierRows = masters.supplierRows || [];
+  const projectRows = masters.projectRows || [];
+  const result = validateInvoiceDraft(
+    draft,
+    {
+      suppliers: supplierRows.map((supplierRow) => ({
+        name: supplierRow.SUPPLIER_NAME ?? "",
+        number: supplierRow.SUPPLIER_NUMBER ?? "",
+      })),
+      projects: projectRows.map((projectRow) => ({
+        name: projectRow.PROJECT_NAME ?? "",
+        number: projectRow.PROJECT_NUMBER ?? "",
+      })),
+      invoices: Array.isArray(opts.invoices) ? opts.invoices : [],
+    },
+    { excludeHeaderId: opts.excludeHeaderId ?? null },
+  );
+  return result.messages;
+}
+
+export function mapInvoiceRows(headerRows, lineRows, masters = null) {
   const linesByHeader = new Map();
   for (const line of lineRows) {
     const list = linesByHeader.get(line.HEADER_ID) || [];
@@ -76,26 +119,40 @@ export function mapInvoiceRows(headerRows, lineRows) {
     linesByHeader.set(line.HEADER_ID, list);
   }
 
-  return headerRows.map((row) => ({
-    id: `db-${row.HEADER_ID}`,
-    fileId: Number(row.FILE_ID ?? 0),
-    fileName: row.FILE_NAME ?? "",
-    filePath: row.FILE_PATH ?? "",
-    invoiceNumber: row.INVOICE_NUMBER ?? "",
-    supplier: row.SUPPLIER_NAME ?? row.VENDOR_NAME ?? "",
-    project: row.PROJECT_NAME ?? "",
-    projectNumber: row.PROJECT_NUMBER ?? "",
-    jobNumber: row.JOB_NUMBER ?? "",
-    source: normalizeSource(row.INVOICE_SOURCE, row.FILE_PATH),
-    receivedDate: toIsoDate(row.RECEIVED_DATE || row.INVOICE_DATE),
-    invoiceDate: toIsoDate(row.INVOICE_DATE),
-    amount: Number(row.AMOUNT_DUE ?? 0),
-    currency: row.INVOICE_CURRENCY ?? "USD",
-    status: KNOWN_STATUSES.has(row.PROCESSING_STATUS) ? row.PROCESSING_STATUS : "Received",
-    remittanceAddress: row.REMITTANCE_ADDRESS ?? "",
-    billToAddress: row.BILL_TO ?? row.CUSTOMER_ADDRESS ?? "",
-    exceptionCount: Number(row.EXCEPTION_COUNT ?? 0),
-    payablesReviewConfirmed: row.PAYABLES_REVIEW_CONFIRMED === "Y",
-    lines: linesByHeader.get(row.HEADER_ID) || [],
+  const storedInvoices = headerRows.map((headerRow) => ({
+    headerId: headerRow.HEADER_ID,
+    invoiceNumber: headerRow.INVOICE_NUMBER ?? "",
+    supplierId: headerRow.SUPPLIER_ID ?? null,
+    vendorName: headerRow.SUPPLIER_NAME ?? headerRow.VENDOR_NAME ?? "",
+    status: headerRow.PROCESSING_STATUS ?? "",
   }));
+
+  return headerRows.map((row) => {
+    const lines = linesByHeader.get(row.HEADER_ID) || [];
+    return {
+      id: `db-${row.HEADER_ID}`,
+      fileId: Number(row.FILE_ID ?? 0),
+      fileName: row.FILE_NAME ?? "",
+      filePath: row.FILE_PATH ?? "",
+      invoiceNumber: row.INVOICE_NUMBER ?? "",
+      supplier: row.SUPPLIER_NAME ?? row.VENDOR_NAME ?? "",
+      supplierNumber: row.SUPPLIER_NUMBER ?? "",
+      project: row.PROJECT_NAME ?? "",
+      projectNumber: row.PROJECT_NUMBER ?? "",
+      jobNumber: row.JOB_NUMBER ?? "",
+      source: normalizeSource(row.INVOICE_SOURCE, row.FILE_PATH),
+      receivedDate: toIsoDate(row.RECEIVED_DATE || row.INVOICE_DATE),
+      invoiceDate: toIsoDate(row.INVOICE_DATE),
+      amount: Number(row.AMOUNT_DUE ?? 0),
+      currency: row.INVOICE_CURRENCY ?? "USD",
+      status: KNOWN_STATUSES.has(row.PROCESSING_STATUS) ? row.PROCESSING_STATUS : "Received",
+      invoiceType: invoiceTypeOf(row.INVOICE_TYPE),
+      remittanceAddress: row.REMITTANCE_ADDRESS ?? "",
+      billToAddress: row.BILL_TO ?? row.CUSTOMER_ADDRESS ?? "",
+      exceptionCount: Number(row.EXCEPTION_COUNT ?? 0),
+      exceptionMessages: exceptionMessagesFor(row, lineRows.filter((line) => line.HEADER_ID === row.HEADER_ID), masters, { invoices: storedInvoices, excludeHeaderId: row.HEADER_ID }),
+      payablesReviewConfirmed: row.PAYABLES_REVIEW_CONFIRMED === "Y",
+      lines,
+    };
+  });
 }

@@ -29,9 +29,29 @@ import {
   listPdfAttachments,
 } from "./gmail-ingest.mjs";
 import { convertWithEngine } from "../convert.mjs";
+import { validateInvoiceDraft } from "../invoice-validation.mjs";
+import { convertPdfToInvoiceJson } from "../../server/llama.mjs";
 import { isPdfBuffer, storedFileNameFor } from "../Manual/manual-upload.mjs";
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
+
+/** Audit folder per ingest channel under convertedToJson/. */
+export const AUDIT_CHANNEL_DIRS = {
+  Gmail: "Gmail",
+  WhatsApp: "WhatsApp",
+  "Manual Upload": "Manual",
+};
+
+/** Source PDF basename plus a timestamp, so re-uploads never overwrite. */
+export function auditFileName(originalName, stamp = Date.now()) {
+  const base =
+    String(originalName || "invoice")
+      .split(/[\\/]/)
+      .pop()
+      .replace(/\.pdf$/i, "") || "invoice";
+  const safeStamp = String(stamp ?? Date.now()).replace(/[:.]/g, "-");
+  return `${base}-${safeStamp}.json`;
+}
 
 let cachedSchemaText = null;
 
@@ -76,7 +96,7 @@ export async function importPdfBuffer(
     from = "",
     date = "",
     snippet = "",
-    mode = "llama",
+    mode = "react",
     maxAttempts = 3,
     modelFn,
   },
@@ -90,7 +110,15 @@ export async function importPdfBuffer(
     mkdirFn = mkdir,
     writeFileFn = writeFile,
     readFileFn = readFile,
+    onProgress,
   } = deps;
+  const reportFile = (stage, detail) => {
+    try {
+      onProgress?.({ stage, file: originalName || "invoice.pdf", detail });
+    } catch {
+      // Progress must never break the import.
+    }
+  };
   const activeModelFn = modelFn ?? depModelFn;
   const channel = sourceChannel === "Gmail" ? "Gmail" : "Manual Upload";
   const createdBy = channel === "Gmail" ? "GMAIL_SYNC" : "FILE_SYNC";
@@ -104,6 +132,7 @@ export async function importPdfBuffer(
   // Step 2: read the staged file back and run the shared PDF-to-JSON
   // conversion honoring the Dashboard engine toggle (llama direct,
   // ReAct validating loop with llama fallback).
+  reportFile("converting", `Reading ${originalName || "invoice.pdf"} and extracting JSON.`);
   const staged = await readFileFn(path.join(stagingDir, storedName));
   const schemaText = await schemaTextFn();
   const emailContext = buildLlamaPrompt({ subject, from, date, snippet, filename: originalName });
@@ -117,6 +146,7 @@ export async function importPdfBuffer(
     ...(activeModelFn ? { modelFn: activeModelFn } : {}),
     maxAttempts,
   });
+  reportFile("inserting", `Writing ${originalName || "invoice.pdf"} to the Oracle tables.`);
 
   const stored = await insertDraft(
     connection,
@@ -131,6 +161,7 @@ export async function importPdfBuffer(
       createdBy,
       fallbackDescription: subject,
     },
+    { auditFs: deps.auditFs, auditRoot: deps.auditRoot },
   );
   return { ...stored, engine };
 }
@@ -177,7 +208,12 @@ export async function insertDraft(
   connection,
   draft,
   { storedName, originalName, filePath, fileSizeBytes, messageId, channel, createdBy, fallbackDescription = "" },
+  deps = {},
 ) {
+  // Audit persistence for convertedToJson/<Channel>/<same-name>.json.
+  // Injectable for tests; production writes to convertedToJson/.
+  const auditFs = deps.auditFs || { mkdir, writeFile };
+  const auditRoot = deps.auditRoot || path.join(root, "convertedToJson");
   // RETURNING INTO captures the id actually stored, even if a trigger or
   // identity column overrides the supplied value. That stored id is what
   // the child rows must reference, otherwise FK_HEADER_FILE fails.
@@ -215,6 +251,61 @@ export async function insertDraft(
       `file_details row ${fileId} not found right after insert (trigger/identity override?)`,
     );
   }
+  // Validate the draft against the ERP masters before writing the header.
+  // New rows arrive as Received (the column default); validation promotes
+  // them to Matched, or Exception with one message per failed check.
+  // Missing master tables (schema not created yet) validate as unmatched
+  // rather than failing the whole import.
+  let masters = { suppliers: [], projects: [] };
+  try {
+    const [supplierResult, projectResult] = await Promise.all([
+      connection.execute(
+        "SELECT supplier_id, supplier_number, supplier_name FROM supplier_master",
+        [],
+        { outFormat: oracledb.OUT_FORMAT_OBJECT },
+      ),
+      connection.execute(
+        "SELECT project_id, project_number, project_name FROM project_master",
+        [],
+        { outFormat: oracledb.OUT_FORMAT_OBJECT },
+      ),
+    ]);
+    masters = {
+      suppliers: (supplierResult.rows || []).map((row) => ({
+        id: row.SUPPLIER_ID,
+        name: row.SUPPLIER_NAME ?? "",
+        number: row.SUPPLIER_NUMBER ?? "",
+      })),
+      projects: (projectResult.rows || []).map((row) => ({
+        id: row.PROJECT_ID,
+        name: row.PROJECT_NAME ?? "",
+        number: row.PROJECT_NUMBER ?? "",
+      })),
+    };
+  } catch {
+    masters = { suppliers: [], projects: [] };
+  }
+  // Earlier copies of the same invoice number for duplicate detection.
+  // Missing table/columns (schema not created yet) mean no duplicates
+  // rather than a failed import.
+  let storedInvoices = [];
+  try {
+    const invoiceResult = await connection.execute(
+      "SELECT header_id, invoice_number, supplier_id, supplier_name, vendor_name, processing_status FROM invoice_header",
+      [],
+      { outFormat: oracledb.OUT_FORMAT_OBJECT },
+    );
+    storedInvoices = (invoiceResult.rows || []).map((row) => ({
+      headerId: row.HEADER_ID,
+      invoiceNumber: row.INVOICE_NUMBER ?? "",
+      supplierId: row.SUPPLIER_ID ?? null,
+      vendorName: row.SUPPLIER_NAME ?? row.VENDOR_NAME ?? "",
+      status: row.PROCESSING_STATUS ?? "",
+    }));
+  } catch {
+    storedInvoices = [];
+  }
+  const validation = validateInvoiceDraft(draft, { ...masters, invoices: storedInvoices });
   const suppliedHeaderId = await nextId(connection, "INVOICE_HEADER", "HEADER_ID");
   const headerId =
     (await insertAdaptive(
@@ -223,16 +314,20 @@ export async function insertDraft(
       [
         ["HEADER_ID", suppliedHeaderId],
         ["FILE_ID", fileId],
+        ["SUPPLIER_ID", validation.supplierId],
+        ["PROJECT_ID", validation.projectId],
         ["INVOICE_NUMBER", draft.invoiceNumber],
         ["VENDOR_NAME", draft.vendorName],
         ["SUPPLIER_NAME", draft.vendorName],
+        ["SUPPLIER_NUMBER", validation.supplierNumber || null],
         ["INVOICE_DATE", draft.invoiceDate ? new Date(draft.invoiceDate) : null],
         ["RECEIVED_DATE", new Date()],
         ["AMOUNT_DUE", draft.amountDue],
         ["INVOICE_CURRENCY", draft.currency],
         ["INVOICE_SOURCE", channel],
-        ["PROCESSING_STATUS", draft.lowConfidence ? "Exception" : "Received"],
-        ["EXCEPTION_COUNT", draft.lowConfidence ? 1 : 0],
+        ["INVOICE_TYPE", validation.invoiceType],
+        ["PROCESSING_STATUS", validation.status],
+        ["EXCEPTION_COUNT", validation.exceptionCount],
         ["PROJECT_NUMBER", draft.projectNumber || null],
         ["JOB_NUMBER", draft.jobNumber || null],
         ["BILLING_ADDRESS", draft.billingAddress || null],
@@ -293,7 +388,49 @@ export async function insertDraft(
       ["LINE_ID", "HEADER_ID"],
     );
   }
-  return { status: "imported", fileId, headerId, lineCount: rows.length };
+  // Audit: persist the converted JSON under convertedToJson/<Channel>/
+  // with the source PDF's filename (.json). Audit must never fail the import.
+  const auditRecord = {
+    channel,
+    originalName,
+    storedName,
+    filePath,
+    fileId,
+    headerId,
+    messageId: messageId ?? null,
+    invoiceType: validation.invoiceType,
+    processingStatus: validation.status,
+    exceptionCount: validation.exceptionCount,
+    exceptionMessages: validation.messages,
+    convertedAt: new Date().toISOString(),
+    draft,
+  };
+  const auditName = auditFileName(originalName, `${auditRecord.convertedAt}-${fileId}`);
+  let auditError = null;
+  try {
+    const auditDir = path.join(auditRoot, AUDIT_CHANNEL_DIRS[channel] || "Manual");
+    await auditFs.mkdir(auditDir, { recursive: true });
+    await auditFs.writeFile(
+      path.join(auditDir, auditName),
+      `${JSON.stringify(auditRecord, null, 2)}\n`,
+    );
+  } catch (error) {
+    // Audit must never fail the import, but surface the cause so a
+    // missing convertedToJson file is diagnosable from the sync summary.
+    auditError = String(error?.message || error);
+  }
+  return {
+    status: "imported",
+    fileId,
+    headerId,
+    lineCount: rows.length,
+    processingStatus: validation.status,
+    invoiceType: validation.invoiceType,
+    exceptionCount: validation.exceptionCount,
+    exceptionMessages: validation.messages,
+    auditFile: path.join(AUDIT_CHANNEL_DIRS[channel] || "Manual", auditName).replace(/\\/g, "/"),
+    ...(auditError ? { auditError } : {}),
+  };
 }
 
 /**
@@ -336,9 +473,18 @@ export async function importAttachment(
 }
 
 export async function syncGmailInvoices(
-  { maxMessages = 5, processedLabel = "SIRE/Processed", archive = true, mode = "llama", maxAttempts = 3, modelFn } = {},
+  { maxMessages = 5, processedLabel = "SIRE/Processed", archive = true, mode = "react", maxAttempts = 3, modelFn, onProgress } = {},
   deps = {},
 ) {
+  // Progress reporting for the dashboard stepper. Never throws: a progress
+  // callback must not break the import itself.
+  const report = (event) => {
+    try {
+      onProgress?.({ ...event, at: new Date().toISOString() });
+    } catch {
+      // Ignore progress listener failures.
+    }
+  };
   const {
     getAccessTokenFn = getAccessToken,
     ensureLabelFn = ensureLabel,
@@ -353,12 +499,19 @@ export async function syncGmailInvoices(
     mode,
     maxAttempts,
     ...(modelFn ? { modelFn } : {}),
+    onProgress: report,
   };
+  report({ stage: "reading", detail: "Connecting to Gmail and listing unread PDF messages." });
   const accessToken = await getAccessTokenFn();
   const labelId = await ensureLabelFn(processedLabel, accessToken);
   const list = await listMessagesFn(accessToken, {
     query: buildUnprocessedPdfQuery(processedLabel),
     maxResults: maxMessages,
+  });
+  report({
+    stage: "reading",
+    detail: `Found ${(list.messages || []).length} message(s) to check.`,
+    total: (list.messages || []).length,
   });
   const pool = await getDbPoolFn();
   const connection = await pool.getConnection();
@@ -393,6 +546,7 @@ export async function syncGmailInvoices(
         for (const attachment of attachments) {
           const label = attachment.filename || attachment.attachmentId;
           try {
+            report({ stage: "reading", detail: `Downloading ${label}.`, file: label });
             const result = await importAttachmentFn(connection, accessToken, {
               item,
               attachment,
@@ -403,6 +557,9 @@ export async function syncGmailInvoices(
             }, convertDeps);
             if (result.status === "imported") {
               summary.imported += 1;
+              if (result.auditError) {
+                summary.notes.push(`${item.id}/${label}: audit file not written (${result.auditError})`);
+              }
             } else {
               summary.skipped += 1;
               summary.notes.push(`${item.id}/${label}: ${result.reason}`);
@@ -427,6 +584,7 @@ export async function syncGmailInvoices(
     } catch {
       // Ignore rollback errors; report the original failure.
     }
+    report({ stage: "error", detail: String(error?.message || error) });
     throw error;
   } finally {
     try {
@@ -435,5 +593,6 @@ export async function syncGmailInvoices(
       // Ignore close errors.
     }
   }
+  report({ stage: "done", summary });
   return summary;
 }

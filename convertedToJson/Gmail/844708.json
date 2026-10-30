@@ -1,0 +1,128 @@
+{
+  "channel": "Gmail",
+  "originalName": "844708.pdf",
+  "storedName": "gmail-1793325554537-844708.pdf",
+  "filePath": "files/Gmail/gmail-1793325554537-844708.pdf",
+  "fileId": 3,
+  "headerId": 3,
+  "messageId": "1a18a881523b356d",
+  "invoiceType": "Standard",
+  "processingStatus": "Exception",
+  "exceptionCount": 1,
+  "exceptionMessages": [
+    "Invoice header amount 2640.10 does not match the lines total 0.00."
+  ],
+  "convertedAt": "2026-10-30T01:59:34.918Z",
+  "draft": {
+    "invoiceNumber": "GMAIL-523b356d",
+    "vendorName": "KATH FUEL OIL SERVICE CO",
+    "invoiceDate": "2026-01-22",
+    "dueDate": "2026-02-15",
+    "amountDue": 2640.1,
+    "currency": "USD",
+    "projectNumber": "",
+    "projectName": "",
+    "supplierNumber": "",
+    "amountInvalid": false,
+    "jobNumber": "JOB# 23120003",
+    "paymentTerms": "15TH OF FOLLOWING MO",
+    "previousUnpaidBalance": null,
+    "totalTax": 203.62,
+    "totalVat": 0,
+    "billingAddress": "BOX 1333, MD 2087-1333",
+    "billingAddressRecipient": "SIRE CO, MD",
+    "customerAddress": "BOX 1333, MD 2087-1333",
+    "customerAddressRecipient": "SIRE CO, MD",
+    "remittanceAddress": "",
+    "remittanceAddressRecipient": "",
+    "shippingAddress": "3000 145 TH STREET E, W OF ADDRESS, ROSEMOUNT, MN 55068",
+    "shippingAddressRecipient": "SIRE, MAIN",
+    "shippingCost": null,
+    "vendorAddress": "3096 RICE ST, LITTLE CANADA, MN 55113",
+    "notes": " PO:JOB# 23120003",
+    "purchaseOrder": "JOB# 23120003",
+    "lines": [
+      {
+        "lineNum": "1",
+        "name": "",
+        "productCode": "",
+        "description": "",
+        "quantity": 0,
+        "units": "ea",
+        "unitPrice": 0,
+        "amount": 0
+      },
+      {
+        "lineNum": "2",
+        "name": "",
+        "productCode": "",
+        "description": "",
+        "quantity": 0,
+        "units": "ea",
+        "unitPrice": 0,
+        "amount": 0
+      },
+      {
+        "lineNum": "3",
+        "name": "",
+        "productCode": "",
+        "description": "",
+        "quantity": 0,
+        "units": "ea",
+        "unitPrice": 0,
+        "amount": 0
+      },
+      {
+        "lineNum": "4",
+        "name": "",
+        "productCode": "",
+        "description": "",
+        "quantity": 0,
+        "units": "ea",
+        "unitPrice": 0,
+        "amount": 0
+      },
+      {
+        "lineNum": "5",
+        "name": "",
+        "productCode": "",
+        "description": "",
+        "quantity": 0,
+        "units": "ea",
+        "unitPrice": 0,
+        "amount": 0
+      },
+      {
+        "lineNum": "6",
+        "name": "",
+        "productCode": "",
+        "description": "",
+        "quantity": 0,
+        "units": "ea",
+        "unitPrice": 0,
+        "amount": 0
+      },
+      {
+        "lineNum": "7",
+        "name": "",
+        "productCode": "",
+        "description": "",
+        "quantity": 0,
+        "units": "ea",
+        "unitPrice": 0,
+        "amount": 0
+      },
+      {
+        "lineNum": "8",
+        "name": "",
+        "productCode": "",
+        "description": "",
+        "quantity": 0,
+        "units": "ea",
+        "unitPrice": 0,
+        "amount": 0
+      }
+    ],
+    "lowConfidence": true
+  }
+}

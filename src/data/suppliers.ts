@@ -11,6 +11,8 @@ export type SupplierStatus = "Active" | "Inactive";
 
 export interface SupplierFeedRecord {
   supplier: string;
+  /** ERP supplier number; matching accepts name or number. */
+  supplierNumber?: string;
   status: SupplierStatus;
   /** Feed start date (ISO). */
   startDate: string;

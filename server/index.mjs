@@ -15,11 +15,12 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 
-import { getDbPool, getDbStatus, getLiveData } from "./db.mjs";
+import { getDbPool, getDbStatus, getLiveData, warmDbPool } from "./db.mjs";
 import { documentFileId, resolveDocumentEntry } from "./file-document.mjs";
 import { enqueueForErp } from "./erp-queue.mjs";
 import { markReadyInvoices } from "./readiness.mjs";
 import { recordReviewDecision } from "./review-decision.mjs";
+import { updateLiveInvoice } from "./invoice-update.mjs";
 import { getAccessToken, gmail, headerValue, readJson, root } from "../invoiceSource/Gmail/gmail-client.mjs";
 import { syncGmailInvoices } from "../invoiceSource/Gmail/gmail-sync.mjs";
 import { entryAbsolutePath, insertManualFromConversion, isPdfBuffer, nextFileId, storedFileNameFor } from "../invoiceSource/Manual/manual-upload.mjs";
@@ -356,12 +357,12 @@ async function handleWhatsappMessage(req, res, send) {
   // a failed extraction falls back to low-confidence defaults so the
   // receipt is never lost.
   const url = new URL(req.url || "/", "http://localhost");
-  const engine = decodeURIComponent(req.headers["x-engine"] || "") || url.searchParams.get("mode") || "llama";
+  const engine = decodeURIComponent(req.headers["x-engine"] || "") || url.searchParams.get("mode") || "react";
   const sender = decodeURIComponent(req.headers["x-sender"] || "");
   const caption = decodeURIComponent(req.headers["x-caption"] || "");
   let draft;
   let extracted = false;
-  let activeEngine = "llama";
+  let activeEngine = "react";
   try {
     const schemaText = await readInvoiceSchema();
     const converted = await convertWithEngine(buffer, {
@@ -483,6 +484,63 @@ async function handleErpEnqueue(req, res, send) {
 }
 
 /**
+ * Live edit: update one invoice_header row plus its lines, log the EDIT
+ * review action, and notify the Payables Manager.
+ */
+async function handleUpdateInvoice(req, res, send) {
+  let body;
+  try {
+    body = await readJsonBody(req);
+  } catch {
+    send(400, { error: "Request body must be JSON." });
+    return;
+  }
+  const headerId = Number(body.headerId);
+  if (!Number.isInteger(headerId)) {
+    send(400, { error: "headerId is required." });
+    return;
+  }
+  // Deadlocks (ORA-00060/ORA-12860) are transient: retry on a fresh
+  // connection with backoff instead of failing the save.
+  const maxAttempts = 3;
+  for (let attempt = 1; ; attempt++) {
+    let connection;
+    try {
+      connection = await (await getDbPool()).getConnection();
+      const stored = await updateLiveInvoice(connection, headerId, body.fields || {}, {
+        actionBy: typeof body.actionBy === "string" ? body.actionBy : "",
+        remarks: typeof body.remarks === "string" ? body.remarks : "",
+      });
+      send(200, { ok: true, ...stored });
+      try {
+        await connection.close();
+      } catch {
+        // Ignore close errors.
+      }
+      return;
+    } catch (error) {
+      try {
+        await connection?.rollback();
+      } catch {
+        // Ignore rollback errors; report the original failure.
+      }
+      try {
+        await connection?.close();
+      } catch {
+        // Ignore close errors.
+      }
+      const message = String(error?.message || error);
+      if (attempt < maxAttempts && /ORA-(00060|12860)/.test(message)) {
+        await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** (attempt - 1)));
+        continue;
+      }
+      send(400, { ok: false, error: message });
+      return;
+    }
+  }
+}
+
+/**
  * Mark-ready: promote qualifying headers to Ready without user intervention.
  */
 async function handleMarkReady(req, res, send) {
@@ -557,6 +615,17 @@ async function handleReviewDecision(req, res, send) {
   }
 }
 
+const LIVE_CACHE_TTL_MS = 30_000;
+let cachedLive = null;
+let cachedLiveAt = 0;
+/** Latest Gmail sync progress for the dashboard stepper. */
+let gmailSyncProgress = { stage: "idle", detail: "", at: null };
+/** Drop the live snapshot so the next dashboard load re-reads Oracle. */
+function bustLiveCache() {
+  cachedLive = null;
+  cachedLiveAt = 0;
+}
+
 const server = http.createServer(async (req, res) => {
   const send = (status, data) => {
     res.writeHead(status, { "Content-Type": "application/json" });
@@ -567,22 +636,40 @@ const server = http.createServer(async (req, res) => {
     const pdfMatch = documentFileId(req.url) !== null;
     if (pathname === "/api/manual-uploads" && req.method === "POST") {
       await handleManualUpload(req, res, send);
+      bustLiveCache();
     } else if (pathname === "/api/manual-invoices" && req.method === "POST") {
       await handleManualInvoiceInsert(req, res, send);
+      bustLiveCache();
     } else if (pathname === "/api/convert" && req.method === "POST") {
       await handleConvert(req, res, send);
+      bustLiveCache();
     } else if (pathname === "/api/erp/enqueue" && req.method === "POST") {
       await handleErpEnqueue(req, res, send);
     } else if (pathname === "/api/invoices/mark-ready" && req.method === "POST") {
       await handleMarkReady(req, res, send);
+      bustLiveCache();
     } else if (pathname === "/api/reviews/decision" && req.method === "POST") {
       await handleReviewDecision(req, res, send);
+      bustLiveCache();
+    } else if (pathname === "/api/invoices/update" && req.method === "POST") {
+      await handleUpdateInvoice(req, res, send);
+      bustLiveCache();
     } else if (pdfMatch && (req.method === "GET" || req.method === "HEAD")) {
       await serveInvoicePdf(req, res, documentFileId(req.url));
     } else if (pathname === "/api/db/status") {
       send(200, await getDbStatus());
     } else if (pathname === "/api/live/data") {
-      send(200, await getLiveData());
+      // Short cache: dashboard revisits within 30s reuse the last snapshot
+      // instead of re-querying Oracle. Mutations below bust the cache;
+      // ?fresh=1 forces a re-read for the manual refresh button.
+      const forceFresh = (req.url || "").includes("fresh=1");
+      if (!forceFresh && cachedLive && Date.now() - cachedLiveAt < LIVE_CACHE_TTL_MS) {
+        send(200, cachedLive);
+      } else {
+        cachedLive = await getLiveData();
+        cachedLiveAt = Date.now();
+        send(200, cachedLive);
+      }
     } else if (pathname === "/api/health") {
       send(200, { ok: true, service: "sire-api" });
     } else if (pathname === "/api/sources/gmail") {
@@ -594,15 +681,27 @@ const server = http.createServer(async (req, res) => {
     } else if (pathname === "/api/sources/gmail/sync" && req.method === "POST") {
       try {
         const syncBody = await readJsonBody(req).catch(() => ({}));
-        const syncMode = syncBody.mode === "react" ? "react" : "llama";
-        send(200, { ok: true, ...(await syncGmailInvoices({ mode: syncMode })) });
+        const syncMode = syncBody.mode === "llama" ? "llama" : "react";
+        gmailSyncProgress = { stage: "reading", detail: "Sync started.", at: new Date().toISOString() };
+        const summary = await syncGmailInvoices({
+          mode: syncMode,
+          onProgress: (event) => {
+            gmailSyncProgress = event;
+          },
+        });
+        send(200, { ok: true, ...summary });
+        bustLiveCache();
       } catch (error) {
+        gmailSyncProgress = { stage: "error", detail: String(error?.message || error), at: new Date().toISOString() };
         send(500, { ok: false, error: String(error?.message || error) });
       }
+    } else if (pathname === "/api/sources/gmail/sync/progress") {
+      send(200, { ok: true, progress: gmailSyncProgress });
     } else if (pathname === "/api/sources/whatsapp") {
       send(200, getWhatsAppStatus());
     } else if (pathname === "/api/sources/whatsapp/messages" && req.method === "POST") {
       await handleWhatsappMessage(req, res, send);
+      bustLiveCache();
     } else {
       send(404, { error: "not found" });
     }
@@ -613,4 +712,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`SIRE API listening on http://127.0.0.1:${PORT}`);
+  warmDbPool();
 });

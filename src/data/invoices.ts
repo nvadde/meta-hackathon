@@ -55,6 +55,8 @@ export interface Invoice {
   filePath: string;
   invoiceNumber: string;
   supplier: string;
+  /** ERP supplier number; validation accepts name or number. */
+  supplierNumber?: string;
   project: string;
   projectNumber: string;
   jobNumber: string;
@@ -64,9 +66,13 @@ export interface Invoice {
   amount: number;
   currency: string;
   status: ProcessingStatus;
+  /** invoice_header.invoice_type: "Standard" by default, "Credit memo" for negative totals. */
+  invoiceType?: string;
   remittanceAddress: string;
   billToAddress: string;
   exceptionCount: number;
+  /** Capture-time validation messages for Exception rows (stored exception reason). */
+  exceptionMessages?: string[];
   /** Set when the payables team has reviewed an inactive supplier/project invoice. */
   payablesReviewConfirmed?: boolean;
   lines: InvoiceLine[];
@@ -215,6 +221,7 @@ const invoiceRecords: InvoiceRecord[] = [
     amount: -1250,
     currency: "USD",
     status: "Exception",
+    invoiceType: "Credit memo",
     remittanceAddress: "Atlas Concrete Ltd, 44 Quarry Rd, Austin, TX",
     billToAddress: "SIRE Projects, Riverside Tower Site Office",
     exceptionCount: 2,

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  invoiceSources,
   processingStatuses,
   type Invoice,
   type InvoiceSource,
@@ -15,7 +16,7 @@ import {
 import { formatAmount, formatDate } from "@/lib/format";
 import { projectFeed as sampleProjectFeed, type ProjectFeedRecord } from "@/data/projects";
 import { supplierFeed as sampleSupplierFeed, type SupplierFeedRecord } from "@/data/suppliers";
-import { canApprove, linesTotal } from "@/lib/review";
+import { canApprove, describeInvoiceChanges, linesTotal } from "@/lib/review";
 import {
   INVALID_SUPPLIER_PROJECT_REMARKS,
   PAYABLES_CONTACT,
@@ -118,6 +119,7 @@ export function InvoiceDetail({
   readOnly = false,
   liveDecisions = false,
   onSave,
+  onUpdateLive,
   onApprove,
   onReject,
 }: {
@@ -130,6 +132,7 @@ export function InvoiceDetail({
   backLabel: string;
   onBack: () => void;
   onSave: (updated: Invoice, approvalRemarks?: string) => string[];
+  onUpdateLive?: (updated: Invoice, remarks: string) => Promise<string[]> | string[];
   onApprove: (
     invoice: Invoice,
     approvalRemarks: string,
@@ -142,6 +145,7 @@ export function InvoiceDetail({
   ) => string[] | Promise<string[]> | void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState<FormDraft>(() => toDraft(invoice));
   const [errors, setErrors] = useState<string[]>([]);
   const [savedChanges, setSavedChanges] = useState<string[]>([]);
@@ -176,11 +180,13 @@ export function InvoiceDetail({
   }
 
   async function handleApprove() {
+    if (busy) return;
     if (!approvalRemarks.trim()) {
       setApprovalError("Remarks/comments are required to approve. They are sent to Payables Manager with the notification.");
       return;
     }
     setApprovalError("");
+    setBusy(true);
     try {
       const changes = await onApprove(invoice, approvalRemarks.trim(), reviewConfirmed);
       setSavedChanges(
@@ -195,16 +201,20 @@ export function InvoiceDetail({
       setApprovalRemarks("");
     } catch (error) {
       setApprovalError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
     }
   }
 
   async function handleReject() {
+    if (busy) return;
     const remarks = approvalRemarks.trim() || (validation.level === "invalid" ? INVALID_SUPPLIER_PROJECT_REMARKS : "");
     if (!remarks) {
       setApprovalError("Remarks/comments are required to reject this invoice.");
       return;
     }
     setApprovalError("");
+    setBusy(true);
     try {
       const changes = await onReject(invoice, remarks, reviewConfirmed);
       setSavedChanges(
@@ -219,6 +229,8 @@ export function InvoiceDetail({
       setApprovalRemarks("");
     } catch (error) {
       setApprovalError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -229,8 +241,9 @@ export function InvoiceDetail({
     }));
   }
 
-  function handleSave() {
+  async function handleSave() {
     const problems: string[] = [];
+    const liveEdit = readOnly && liveDecisions;
     if (!draft.invoiceNumber.trim()) problems.push("Invoice number is required.");
     if (!draft.supplier.trim()) problems.push("Supplier is required.");
     if (!draft.currency.trim()) problems.push("Currency is required.");
@@ -261,9 +274,9 @@ export function InvoiceDetail({
     if (rejecting && !approvalRemarks.trim() && validation.level !== "invalid") {
       problems.push("Remarks/comments are required when changing the processing status to Rejected.");
     }
-    if (approving && validation.level === "invalid") {
+    if (approving && validation.level === "invalid" && !reviewConfirmed && !invoice.payablesReviewConfirmed) {
       problems.push(
-        `Cannot approve: this invoice must be rejected because it is not a valid supplier or project. Contact ${PAYABLES_CONTACT}.`,
+        `Cannot approve: "${invoice.supplier}" is not a valid supplier${validation.supplierHint ? ` (closest match: "${validation.supplierHint}")` : ""}. Contact ${PAYABLES_CONTACT}. Tick "Payables team review confirmed", add remarks, then Save to approve it after review.`,
       );
     }
     if ((approving || rejecting) && validation.level === "review" && !reviewConfirmed && !invoice.payablesReviewConfirmed) {
@@ -302,6 +315,66 @@ export function InvoiceDetail({
         amount: Number(line.amount),
       })),
     };
+    if (liveEdit) {
+      if (busy) return;
+      if (!onUpdateLive) {
+        setErrors(["Live update is not available in this view."]);
+        return;
+      }
+      if (!approvalRemarks.trim()) {
+        setErrors(["Remarks/comments are required for a live edit. They are sent to Payables Manager with the update notification."]);
+        return;
+      }
+      setBusy(true);
+      const decidingTo =
+        draft.status !== invoice.status && (draft.status === "Approved" || draft.status === "Rejected")
+          ? draft.status
+          : null;
+      try {
+        const allChanges: string[] = [];
+        const fieldChanges = describeInvoiceChanges({ ...updated, status: invoice.status }, invoice);
+        if (fieldChanges.length > 0) {
+          const liveChanges = await onUpdateLive({ ...updated, status: invoice.status }, approvalRemarks.trim());
+          allChanges.push(...(liveChanges && liveChanges.length > 0
+            ? liveChanges
+            : [`Saved to Oracle (header ${updated.invoiceNumber})`, `Notification to Payables Manager: "${approvalRemarks.trim()}"`]));
+        }
+        if (decidingTo === "Approved") {
+          if (!approvable || !gate.canApprove) {
+            setErrors([
+              approveReason ?? gate.reasons.join(" ") ?? "Approval is not available for this invoice.",
+            ]);
+            setBusy(false);
+            return;
+          }
+          const decisionChanges = await onApprove(invoice, approvalRemarks.trim(), reviewConfirmed);
+          if (decisionChanges && decisionChanges.length > 0) allChanges.push(...decisionChanges);
+        } else if (decidingTo === "Rejected") {
+          if (!gate.canReject) {
+            setErrors([
+              gate.reasons.join(" ") || "Rejection is not available for this invoice.",
+            ]);
+            setBusy(false);
+            return;
+          }
+          const decisionChanges = await onReject(invoice, approvalRemarks.trim(), reviewConfirmed);
+          if (decisionChanges && decisionChanges.length > 0) allChanges.push(...decisionChanges);
+        } else if (fieldChanges.length === 0) {
+          // Status-only move between non-final statuses still writes the tables.
+          const liveChanges = await onUpdateLive(updated, approvalRemarks.trim());
+          allChanges.push(...(liveChanges && liveChanges.length > 0 ? liveChanges : []));
+        }
+        setSavedChanges(allChanges);
+        setApprovalRemarks("");
+        setErrors([]);
+        setEditing(false);
+      } catch (error) {
+        setErrors([error instanceof Error ? error.message : String(error)]);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     const changes = onSave(
       updated,
       approving || rejecting
@@ -336,14 +409,14 @@ export function InvoiceDetail({
         <div className="ml-auto flex flex-wrap gap-2">
           {editing ? (
             <>
-              <Button variant="outline" size="sm" onClick={() => setEditing(false)}>
+              <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={busy}>
                 <X aria-hidden="true" /> Cancel
               </Button>
-              <Button size="sm" onClick={handleSave}>
-                <Save aria-hidden="true" /> Save
+              <Button size="sm" onClick={handleSave} disabled={busy}>
+                <Save aria-hidden="true" /> {busy ? "Saving…" : "Save"}
               </Button>
             </>
-          ) : readOnly ? null : (
+          ) : readOnly && !liveDecisions ? null : (
             <Button variant="outline" size="sm" onClick={startEditing}>
               <Pencil aria-hidden="true" /> Edit
             </Button>
@@ -362,10 +435,11 @@ export function InvoiceDetail({
 
       {readOnly && (
         <p className="mb-4 rounded-md border bg-card px-3 py-2 text-sm text-muted-foreground">
-          Live Oracle data: editing header fields is disabled in this step, but approving and
-          rejecting write to Oracle (review action, Payables Manager notification
-          {liveDecisions ? ", and ERP queue for approvals" : ""}). Switch the header toggle to Sample
-          to work with the editable synthetic records.
+          Live Oracle data: use Edit to correct the fields, then Save — the tables are updated,
+          Payables Manager is notified, and the change appears in My Actions. Setting the status
+          to Approved or Rejected runs the normal decision flow (notification
+          {liveDecisions ? ", and ERP queue for approvals" : ""}); other status moves are saved
+          directly. Switch the header toggle to Sample to work with the editable synthetic records.
         </p>
       )}
 
@@ -394,12 +468,26 @@ export function InvoiceDetail({
               <a className="font-semibold underline" href={`mailto:${PAYABLES_CONTACT}`}>
                 {PAYABLES_CONTACT}
               </a>
-              . Use Reject below; approval is blocked. No email is sent automatically.
+              . {reviewConfirmed || invoice.payablesReviewConfirmed
+                ? "Payables team review is confirmed, so approval is allowed after review."
+                : "Use Reject below; approval is blocked until the payables team review is confirmed."}{" "}
+              No email is sent automatically.
             </p>
           )}
           {validation.level === "review" && invoice.payablesReviewConfirmed && (
             <p className="mt-2 font-medium">Payables team review has been confirmed for this invoice.</p>
           )}
+        </div>
+      )}
+
+      {invoice.exceptionMessages && invoice.exceptionMessages.length > 0 && (
+        <div className="mb-4 rounded-lg border bg-card px-4 py-3 text-sm text-card-foreground">
+          <p className="font-semibold">Exceptions recorded at capture ({invoice.exceptionMessages.length})</p>
+          <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+            {invoice.exceptionMessages.map((message) => (
+              <li key={message}>{message}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -421,7 +509,7 @@ export function InvoiceDetail({
       )}
       {(!readOnly || liveDecisions) && !editing && invoice.status !== "Approved" && invoice.status !== "Rejected" && (
         <div className="mb-4 rounded-lg border bg-card p-4 text-card-foreground">
-          {validation.level === "review" && !invoice.payablesReviewConfirmed && (
+          {(validation.level === "review" || validation.level === "invalid") && !invoice.payablesReviewConfirmed && (
             <label className="mb-4 flex items-start gap-2 text-sm">
               <input
                 type="checkbox"
@@ -430,13 +518,13 @@ export function InvoiceDetail({
                 className="mt-1 h-4 w-4 accent-teal"
               />
               <span>
-                <strong>Payables team review confirmed.</strong> This invoice has an inactive
-                supplier or project, so the payables team must review it before approving or
-                rejecting. Tick this only after that review has happened.
+                <strong>Payables team review confirmed.</strong> This invoice failed validation,
+                so the payables team must review it before approving or rejecting. Tick this
+                only after that review has happened.
               </span>
             </label>
           )}
-          {validation.level === "review" && invoice.payablesReviewConfirmed && (
+          {(validation.level === "review" || validation.level === "invalid") && invoice.payablesReviewConfirmed && (
             <p className="mb-4 text-sm font-medium text-teal-dark dark:text-teal">
               Payables team review already confirmed for this invoice.
             </p>
@@ -473,16 +561,16 @@ export function InvoiceDetail({
             </p>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button size="sm" disabled={!approvable} onClick={handleApprove}>
-              <CheckCircle2 aria-hidden="true" /> Approve invoice
+            <Button size="sm" disabled={!approvable || busy} onClick={handleApprove}>
+              <CheckCircle2 aria-hidden="true" /> {busy ? "Working…" : "Approve invoice"}
             </Button>
             <Button
               size="sm"
-              disabled={!gate.canReject}
+              disabled={!gate.canReject || busy}
               onClick={handleReject}
               className="bg-red-600 text-white hover:bg-red-700"
             >
-              <X aria-hidden="true" /> Reject invoice
+              <X aria-hidden="true" /> {busy ? "Working…" : "Reject invoice"}
             </Button>
             <span className="text-sm text-muted-foreground">
               Approving sends an in-app notification, with these remarks, to Payables Manager.
@@ -521,8 +609,8 @@ export function InvoiceDetail({
       {editing ? (
         <div className="mb-6 rounded-lg border bg-card p-5 text-card-foreground">
           <p className="mb-4 text-sm text-muted-foreground">
-            Invoice number, supplier, project, and source channel are non-editable. All other header
-            fields and the lines below can be corrected.
+            Invoice number, supplier, project, project number, and source file are non-editable.
+            All other header fields and the lines below can be corrected.
           </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <EditField label="Invoice number (non-editable)">
@@ -534,14 +622,20 @@ export function InvoiceDetail({
             <EditField label="Project (non-editable)">
               <Input value={draft.project} disabled readOnly aria-readonly="true" />
             </EditField>
-            <EditField label="Project number">
-              <Input value={draft.projectNumber} onChange={(e) => setDraft({ ...draft, projectNumber: e.target.value })} />
+            <EditField label="Project number (non-editable)">
+              <Input value={draft.projectNumber} disabled readOnly aria-readonly="true" />
             </EditField>
             <EditField label="Job number">
               <Input value={draft.jobNumber} onChange={(e) => setDraft({ ...draft, jobNumber: e.target.value })} />
             </EditField>
-            <EditField label="Source channel (non-editable)">
-              <Input value={draft.source} disabled readOnly aria-readonly="true" />
+            <EditField label="Source channel">
+              <select value={draft.source} onChange={(e) => setDraft({ ...draft, source: e.target.value as InvoiceSource })} className={selectClassName}>
+                {invoiceSources.map((source) => (
+                  <option key={source} value={source}>
+                    {source}
+                  </option>
+                ))}
+              </select>
             </EditField>
             <EditField label="Received date">
               <Input type="date" value={draft.receivedDate} onChange={(e) => setDraft({ ...draft, receivedDate: e.target.value })} />
@@ -590,7 +684,8 @@ export function InvoiceDetail({
             </Button>
           </div>
           {((invoice.status !== "Approved" && draft.status === "Approved") ||
-            (invoice.status !== "Rejected" && draft.status === "Rejected")) && (
+            (invoice.status !== "Rejected" && draft.status === "Rejected") ||
+            (readOnly && liveDecisions)) && (
             <div className="mt-4">
               {validation.level === "review" && !invoice.payablesReviewConfirmed && (
                 <label className="mb-4 flex items-start gap-2 text-sm">
@@ -608,7 +703,7 @@ export function InvoiceDetail({
               )}
               <label className="block">
                 <span className="mb-1 block text-sm font-semibold">
-                  Remarks / comments (required to {draft.status === "Approved" ? "approve" : "reject"})
+                  Remarks / comments (required{readOnly && liveDecisions ? " for a live edit" : ` to ${draft.status === "Approved" ? "approve" : "reject"}`})
                 </span>
                 <textarea
                   value={approvalRemarks}
@@ -622,9 +717,11 @@ export function InvoiceDetail({
                   className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 />
                 <span className="mt-1 block text-sm text-muted-foreground">
-                  {draft.status === "Approved"
-                    ? "Saving with status Approved sends an in-app notification, with these remarks, to Payables Manager."
-                    : "Saving with status Rejected records these remarks in My Actions."}
+                  {readOnly && liveDecisions
+                    ? "Saving writes the tables, notifies Payables Manager with these remarks, and logs the change in My Actions."
+                    : draft.status === "Approved"
+                      ? "Saving with status Approved sends an in-app notification, with these remarks, to Payables Manager."
+                      : "Saving with status Rejected records these remarks in My Actions."}
                 </span>
               </label>
             </div>
@@ -641,6 +738,7 @@ export function InvoiceDetail({
             <DetailField label="Invoice date" value={formatDate(invoice.invoiceDate)} />
             <DetailField label="Amount with currency" value={`${formatAmount(invoice.amount, invoice.currency)} ${invoice.currency}`} />
             <DetailField label="Processing status" value={invoice.status} />
+            <DetailField label="Invoice type" value={invoice.invoiceType ?? "Standard"} />
             <DetailField label="Exception count" value={String(invoice.exceptionCount)} />
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Source channel</dt>

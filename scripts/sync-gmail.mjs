@@ -23,7 +23,7 @@ const { syncGmailInvoices } = await import("../invoiceSource/Gmail/gmail-sync.mj
 const { closeDbPool } = await import("../server/db.mjs");
 
 const modeFlag = process.argv.indexOf("--mode");
-const mode = modeFlag >= 0 && process.argv[modeFlag + 1] === "react" ? "react" : "llama";
+const mode = modeFlag >= 0 && process.argv[modeFlag + 1] === "llama" ? "llama" : "react";
 
 try {
   const summary = await syncGmailInvoices({ maxMessages: 5, mode });

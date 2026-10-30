@@ -16,6 +16,8 @@ export function InvoiceWorkbench({
   projectFeed,
   onSelectInvoice,
   onAddInvoice,
+  onRefresh,
+  onSynced,
 }: {
   invoices: Invoice[];
   dataMode: DataMode;
@@ -24,7 +26,20 @@ export function InvoiceWorkbench({
   projectFeed: ProjectFeedRecord[];
   onSelectInvoice: (invoice: Invoice) => void;
   onAddInvoice: (invoice: Invoice) => void;
+  onRefresh?: () => Promise<unknown> | unknown;
+  onSynced?: () => Promise<unknown> | unknown;
 }) {
+  const [refreshing, setRefreshing] = useState(false);
+
+  async function handleRefresh() {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await onRefresh?.();
+    } finally {
+      setRefreshing(false);
+    }
+  }
   const live = dataMode === "live";
   const [uploadOpen, setUploadOpen] = useState(false);
   const openUploadPanel = () => {
@@ -36,9 +51,21 @@ export function InvoiceWorkbench({
       <p className="mb-2 text-[13px] font-bold uppercase tracking-wider text-teal-dark dark:text-teal">
         Invoice Workbench {live ? "· Live (Oracle)" : "· Sample data"}
       </p>
-      <h2 className="mb-2 text-[28px] font-semibold leading-tight">Invoice Workbench</h2>
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+        <h2 className="text-[28px] font-semibold leading-tight">Invoice Workbench</h2>
+        {live && (
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="rounded-md border border-input bg-card px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-50"
+          >
+            {refreshing ? "Refreshing…" : "Refresh from Oracle"}
+          </button>
+        )}
+      </div>
 
-      <SourceConnections engine={engine} onUpload={openUploadPanel} />
+      <SourceConnections engine={engine} onUpload={openUploadPanel} onSynced={onSynced} />
       <ManualUpload
         onAddInvoice={onAddInvoice}
         onOpenInvoice={onSelectInvoice}

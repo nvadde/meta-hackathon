@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import type { Invoice } from "@/data/invoices";
 import { projectFeed } from "@/data/projects";
 import { supplierFeed } from "@/data/suppliers";
-import { INVALID_SUPPLIER_PROJECT_REMARKS, validateInvoice } from "@/lib/validation";
+import { validateInvoice } from "@/lib/validation";
 
 const selectClassName =
   "h-10 w-full rounded-md border border-input bg-card px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -136,10 +136,20 @@ export function ManualUpload({
           },
         ],
       };
-      const validation = validateInvoice(invoice, supplierFeedActive, projectFeedActive);
+      // Validation failures never auto-reject: the invoice is stored as
+      // Exception with its count and messages, and the reviewer approves
+      // or rejects it from the detail screen.
+      const uploadValidation = validateInvoice(invoice, supplierFeedActive, projectFeedActive);
       const stored: Invoice =
-        validation.level === "invalid" ? { ...invoice, status: "Rejected" } : invoice;
-      onAddInvoice(invoice);
+        uploadValidation.level === "invalid"
+          ? {
+              ...invoice,
+              status: "Exception",
+              exceptionCount: uploadValidation.issues.length,
+              exceptionMessages: uploadValidation.issues,
+            }
+          : invoice;
+      onAddInvoice(stored);
       setCreated(stored);
       setFile(null);
       setDbNote(null);
@@ -238,7 +248,13 @@ export function ManualUpload({
           )}
           {created && (
             <p className="mb-4 rounded-md bg-teal-soft px-3 py-2 text-sm text-teal-dark dark:bg-teal/20 dark:text-teal">
-              Added {created.invoiceNumber} from {created.fileName}.{" "}{created.status === "Rejected" ? `It was automatically rejected: ${INVALID_SUPPLIER_PROJECT_REMARKS}. ` : ""}
+              Added {created.invoiceNumber} from {created.fileName}.{" "}
+              {(() => {
+                const createdValidation = validateInvoice(created, supplierFeedActive, projectFeedActive);
+                return createdValidation.level === "invalid"
+                  ? `It has ${createdValidation.issues.length} exception(s) and needs review: ${createdValidation.issues.join(" ")} `
+                  : "";
+              })()}
               <button type="button" className="font-semibold underline" onClick={() => onOpenInvoice(created)}>
                 View Details
               </button>{" "}
