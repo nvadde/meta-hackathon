@@ -1,11 +1,26 @@
 # SIRE — Smart Ingestion & Reconciliation Engine
 
-React, TypeScript, Vite, Tailwind CSS, shadcn/ui, and Lucide icons.
+React, TypeScript, Vite, Tailwind CSS, shadcn/ui, and Lucide icons, with
+Oracle Autonomous Database (node-oracledb) and a Muse Spark ReAct extraction
+pipeline.
 
-Current scope: application shell, the Invoice Workbench, and the My Actions invoice
-review workbench with clearly labeled synthetic records (search, filters,
-sorting, pagination, an editable invoice detail screen, and the source PDF).
-No extraction, ERP posting, or database yet.
+## What SIRE is
+
+SIRE stops late supplier payments from freezing job sites. Payables teams
+today open PDFs by hand, cross-check milestones and vendor numbers, and
+re-type data — slow work that delays disbursements. SIRE automates it:
+invoices arrive from Gmail or manual upload, a ReAct agent (Muse Spark)
+extracts them into a strict JSON schema, deterministic validation checks
+supplier, project, duplicates, and math, a human reviewer verifies the PDF
+against the extracted data and approves or rejects with remarks, and approved
+invoices are published to database tables. Any ERP picks up approved invoices
+from those tables and writes back its status — no ERP is configured inside
+SIRE, which keeps it platform-independent, and banking details never enter
+SIRE; they stay in the ERP.
+
+![SIRE high-level flow](SIRE-high-level-flow-corrected.jpg)
+
+Demo video: _link to be added once uploaded_.
 
 ## Run
 
@@ -50,8 +65,9 @@ npm run db:create-tables
 
 This executes `Tables.sql` statement by statement and reports anything that
 already exists instead of failing. The tables have been created in the
-configured database; supplier/project/invoice tables are still empty, so the
-app keeps using synthetic in-browser records until data is loaded into them.
+configured database and now hold live invoice, supplier, and project rows,
+which Live mode shows. Sample mode still uses the synthetic in-browser
+records.
 
 ## Invoice Workbench
 
@@ -66,13 +82,12 @@ app keeps using synthetic in-browser records until data is loaded into them.
 - The **header toggle (Sample / Live)** switches every screen between the
   synthetic records and live Oracle data. Live mode reads `SUPPLIER_MASTER`,
   `PROJECT_MASTER`, `INVOICE_HEADER`, and `INVOICE_LINES` through
-  `GET /api/live/data` (mapped in `server/live-data.mjs`). It is read-only in
-  this step — the detail screen disables editing, approval, rejection, and
-  Manual Upload until invoice write-back is connected. Because the Oracle
-  tables are currently empty, Live mode shows empty tables with an explicit
-  “empty Oracle tables” notice, and Live rows with files map to PDFs the same
-  way (`file_path` → document endpoint). Notifications, My changes, and
-  sample edits only exist in Sample mode.
+  `GET /api/live/data` (mapped in `server/live-data.mjs`). On live records
+  the detail screen supports Edit, approval, and rejection: saving updates
+  the Oracle tables, notifies Payables Manager, and records the change in
+  My Actions. Live rows with files map to PDFs the same way (`file_path` →
+  document endpoint). In Sample mode, Notifications, My changes, and sample
+  edits are browser-local.
 - The detail screen also displays the actual source PDF, served from the
   `file_details.file_path` stored for that invoice, so a human can verify the
   extraction against the document. PDFs live in `files/invoices/`, the
@@ -86,8 +101,9 @@ app keeps using synthetic in-browser records until data is loaded into them.
   screen as “Sample rates (not live FX)”. Unknown currencies show “—” instead of
   a guessed value, and original-currency amounts remain the records of truth.
   Live FX rates are not connected.
-- Source channels are Gmail, WhatsApp, and Manual Upload. Badges on synthetic
-  records are sample source labels, not live connections. Records saved by
+- Source channels are Gmail, WhatsApp (setup pending, not a live source), and
+  Manual Upload. Badges on synthetic records are sample source labels, not live
+  connections; live records carry their actual source channel. Records saved by
   earlier versions with the old source name “Upload” are shown as Manual Upload.
 - **Manual Upload works:** on the workbench, choose **Upload invoice PDF**,
   select a PDF (max 10 MB), and enter the invoice number, supplier, header
@@ -104,9 +120,9 @@ app keeps using synthetic in-browser records until data is loaded into them.
 
 ## Suppliers
 
-- Supplier Details feed received from ERP, shown as a clearly labeled synthetic
-  sample feed in `src/data/suppliers.ts` because ERP is not connected and no
-  live ERP data is fetched.
+- In Sample mode, the Supplier Details feed is shown as a clearly labeled
+  synthetic sample feed in `src/data/suppliers.ts`, because no live ERP data
+  is fetched. In Live mode, the screen reads `SUPPLIER_MASTER`.
 - Columns: supplier, status (Active/Inactive), start date, end date, supplier
   site, supplier address, and No. of invoices. The invoice count is computed
   live from the current workbench records, so edits and Manual Uploads change it.
@@ -120,13 +136,13 @@ app keeps using synthetic in-browser records until data is loaded into them.
 
 ## Projects
 
-- Project Details feed received from ERP, shown as a clearly labeled synthetic
-  sample feed in `src/data/projects.ts` because ERP is not connected and no
-  live ERP data is fetched.
+- In Sample mode, the Project Details feed is shown as a clearly labeled
+  synthetic sample feed in `src/data/projects.ts`, because no live ERP data
+  is fetched. In Live mode, the screen reads `PROJECT_MASTER`.
 - Columns: Project (with project number), status (Active/Inactive), start
   date, end date, project address, and No. of invoices. The invoice count is
-  computed live from the current workbench records, so edits and Manual
-  Uploads change it.
+  computed live from the current workbench records, so edits and Manual Uploads
+  change it.
 - Search by project, project number, or address; filter by status; sort by
   project, start date, or No. of invoices; pagination at 8 per page.
 - Clicking a project (or **View invoices**) lists that project's invoices.
@@ -156,6 +172,9 @@ app keeps using synthetic in-browser records until data is loaded into them.
 - Active, known supplier and project invoices pass validation with no flag.
   These checks sit on top of the existing approval rules (exceptions resolved
   and lines total equal to the header amount).
+- **Status ladder:** validation passes → Matched → human review in the
+  workbench (PDF against header and lines, edits if needed) → Approved or
+  Rejected with remarks → published for ERP pickup if approved.
 
 ## My Actions — invoice review workbench
 
@@ -170,7 +189,7 @@ app keeps using synthetic in-browser records until data is loaded into them.
   with its old and new value under **My changes** in My Actions.
 - **Approve invoice** is enabled only when the exception count is 0 and the
   lines total equals the header amount. Approved invoices are marked “Approved —
-  awaiting ERP”.
+  awaiting ERP pickup”.
 - Approving — with the Approve button or by changing the processing status to
   Approved in Edit and saving — **requires remarks/comments**. Saving creates an
   in-app notification to **Payables Manager** with those remarks; it is listed
@@ -180,10 +199,14 @@ app keeps using synthetic in-browser records until data is loaded into them.
   Exception, Ready, Approved, and **Rejected**.
 - On the detail screen, invoice number, supplier, project, and source channel
   are non-editable. All other header fields and the lines can be corrected.
-- Edits are stored only in this browser (localStorage). **Reset sample data**
-  in My Actions restores the original synthetic records and clears the log.
-- ERP integration is **not connected**: approved invoices are queued for ERP
-  pickup only. Nothing is sent to an ERP and no ERP invoice is created.
+- In Sample mode, edits are stored only in this browser (localStorage).
+  **Reset sample data** in My Actions restores the original synthetic records
+  and clears the log. In Live mode, saves update the Oracle tables and are
+  recorded in My Actions.
+- No ERP is configured inside SIRE: approved invoices are queued for ERP
+  pickup only. Nothing is sent to an ERP and no ERP invoice is created by
+  SIRE; a consuming ERP picks up approved invoices and writes back its
+  status.
 
 ## Live sources
 
@@ -191,7 +214,8 @@ app keeps using synthetic in-browser records until data is loaded into them.
   (Google OAuth client) and `token.json` from the project root on the server
   only, refreshes the access token, and returns the mailbox profile and recent
   message subjects via `/api/sources/gmail`. Secrets are never sent to the
-  browser. No invoice extraction runs on those messages yet.
+  browser. Synced messages flow through the extraction pipeline into invoice
+  records in the workbench.
 - **WhatsApp (setup pending):** a phone number alone cannot connect. It needs a
   WhatsApp Business (Meta) or Twilio account with an access token. Until then,
   no WhatsApp messages are sent or received.
@@ -222,3 +246,4 @@ npm run preview
 - `src/data/invoices.ts` — synthetic invoice records
 - `src/data/sections.ts` — shell section definitions
 - `server/index.mjs` — local backend (Gmail read-only API)
+- `server/live-data.mjs` — live Oracle data API (`GET /api/live/data`)
