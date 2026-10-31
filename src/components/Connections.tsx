@@ -235,7 +235,7 @@ export function Connections() {
           {(whatsapp.kind === "unavailable" ||
             (whatsapp.kind === "ready" && !whatsapp.data.connected)) && (
             <Badge variant="secondary" className="ml-auto gap-1">
-              <XCircle aria-hidden="true" className="h-3 w-3" /> Not connected
+              <XCircle aria-hidden="true" className="h-3 w-3" /> Setup pending
             </Badge>
           )}
         </div>

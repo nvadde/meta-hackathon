@@ -186,10 +186,30 @@ export async function getLiveData(env = process.env) {
       );
       lineRows = lineResult.rows || [];
     }
+    // ERP pickup state is best-effort: a missing queue table (schema not
+    // created yet) leaves every invoice unqueued instead of failing live
+    // data. The published view treats a null queue as "Not queued".
+    let queueByHeader = new Map();
+    try {
+      const queueResult = await connection.execute(
+        `SELECT header_id, queue_status, erp_invoice_id
+           FROM erp_invoice_queue`,
+        [],
+        options,
+      );
+      queueByHeader = new Map(
+        (queueResult.rows || []).map((row) => [
+          row.HEADER_ID,
+          { queueStatus: row.QUEUE_STATUS ?? null, erpInvoiceId: row.ERP_INVOICE_ID ?? null },
+        ]),
+      );
+    } catch {
+      queueByHeader = new Map();
+    }
     const mapped = mapInvoiceRows(headerResult.rows || [], lineRows, {
       supplierRows: supplierResult.rows || [],
       projectRows: projectResult.rows || [],
-    });
+    }, queueByHeader);
     console.log(
       `SIRE live data: ${(supplierResult.rows || []).length} suppliers, ` +
         `${(projectResult.rows || []).length} projects, ${mapped.length} invoices ` +

@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   Link2,
   ListChecks,
+  Send,
   Settings,
   type LucideIcon,
 } from "lucide-react";
@@ -70,6 +71,16 @@ export const sections: Section[] = [
     emptyTitle: "No projects yet",
     emptyText:
       "No projects have been created. Active projects and their milestones will appear here in a later step.",
+  },
+  {
+    id: "published",
+    label: "Published",
+    icon: Send,
+    heading: "Published",
+    lead: "Approved invoices published for ERP pickup and their write-back state.",
+    emptyTitle: "No approved invoices",
+    emptyText:
+      "Approved invoices appear here with their ERP pickup state. Nothing has been approved yet.",
   },
   {
     id: "notifications",

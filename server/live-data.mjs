@@ -112,7 +112,7 @@ export function exceptionMessagesFor(row, lines, masters = null, opts = {}) {
   return result.messages;
 }
 
-export function mapInvoiceRows(headerRows, lineRows, masters = null) {
+export function mapInvoiceRows(headerRows, lineRows, masters = null, queueByHeader = new Map()) {
   const linesByHeader = new Map();
   for (const line of lineRows) {
     const list = linesByHeader.get(line.HEADER_ID) || [];
@@ -160,6 +160,8 @@ export function mapInvoiceRows(headerRows, lineRows, masters = null) {
       exceptionCount: Number(row.EXCEPTION_COUNT ?? 0),
       exceptionMessages: exceptionMessagesFor(row, lineRows.filter((line) => line.HEADER_ID === row.HEADER_ID), masters, { invoices: storedInvoices, excludeHeaderId: row.HEADER_ID }),
       payablesReviewConfirmed: row.PAYABLES_REVIEW_CONFIRMED === "Y",
+      queueStatus: queueByHeader.get(row.HEADER_ID)?.queueStatus ?? null,
+      erpInvoiceId: queueByHeader.get(row.HEADER_ID)?.erpInvoiceId ?? null,
       lines,
     };
   });

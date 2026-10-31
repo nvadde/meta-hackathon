@@ -18,6 +18,7 @@ import path from "node:path";
 import { getDbPool, getDbStatus, getLiveData, warmDbPool } from "./db.mjs";
 import { documentFileId, resolveDocumentEntry } from "./file-document.mjs";
 import { enqueueForErp } from "./erp-queue.mjs";
+import { claimForErp, getPublishedInvoices, writeBackErp } from "./erp-consumer.mjs";
 import { markReadyInvoices } from "./readiness.mjs";
 import { recordReviewDecision } from "./review-decision.mjs";
 import { updateLiveInvoice } from "./invoice-update.mjs";
@@ -645,6 +646,76 @@ const server = http.createServer(async (req, res) => {
       bustLiveCache();
     } else if (pathname === "/api/erp/enqueue" && req.method === "POST") {
       await handleErpEnqueue(req, res, send);
+    } else if (pathname === "/api/erp/published" && req.method === "GET") {
+      let connection;
+      try {
+        connection = await (await getDbPool()).getConnection();
+        send(200, { ok: true, invoices: await getPublishedInvoices(connection) });
+      } catch (error) {
+        send(500, { ok: false, error: String(error?.message || error) });
+      } finally {
+        try {
+          await connection?.close();
+        } catch {
+          // Ignore close errors.
+        }
+      }
+    } else if (pathname === "/api/erp/claim" && req.method === "POST") {
+      let connection;
+      try {
+        const claimBody = await readJsonBody(req).catch(() => ({}));
+        const headerId = Number(claimBody.headerId);
+        connection = await (await getDbPool()).getConnection();
+        const stored = await claimForErp(connection, headerId, {
+          consumer: typeof claimBody.consumer === "string" ? claimBody.consumer : "",
+          createdBy: "SIRE",
+        });
+        await connection.commit();
+        send(200, { ok: true, ...stored });
+      } catch (error) {
+        try {
+          await connection?.rollback();
+        } catch {
+          // Ignore rollback errors; report the original failure.
+        }
+        send(400, { ok: false, error: String(error?.message || error) });
+      } finally {
+        try {
+          await connection?.close();
+        } catch {
+          // Ignore close errors.
+        }
+      }
+      bustLiveCache();
+    } else if (pathname === "/api/erp/write-back" && req.method === "POST") {
+      let connection;
+      try {
+        const writeBackBody = await readJsonBody(req).catch(() => ({}));
+        const headerId = Number(writeBackBody.headerId);
+        connection = await (await getDbPool()).getConnection();
+        const stored = await writeBackErp(connection, headerId, {
+          outcome: typeof writeBackBody.outcome === "string" ? writeBackBody.outcome : "",
+          erpInvoiceId: typeof writeBackBody.erpInvoiceId === "string" ? writeBackBody.erpInvoiceId : "",
+          reason: typeof writeBackBody.reason === "string" ? writeBackBody.reason : "",
+          createdBy: "SIRE",
+        });
+        await connection.commit();
+        send(200, { ok: true, ...stored });
+      } catch (error) {
+        try {
+          await connection?.rollback();
+        } catch {
+          // Ignore rollback errors; report the original failure.
+        }
+        send(400, { ok: false, error: String(error?.message || error) });
+      } finally {
+        try {
+          await connection?.close();
+        } catch {
+          // Ignore close errors.
+        }
+      }
+      bustLiveCache();
     } else if (pathname === "/api/invoices/mark-ready" && req.method === "POST") {
       await handleMarkReady(req, res, send);
       bustLiveCache();

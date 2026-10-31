@@ -75,6 +75,10 @@ export interface Invoice {
   exceptionMessages?: string[];
   /** Set when the payables team has reviewed an inactive supplier/project invoice. */
   payablesReviewConfirmed?: boolean;
+  /** ERP pickup state from erp_invoice_queue (live mode only). */
+  queueStatus?: string | null;
+  /** ERP invoice reference written back by the pickup consumer (live mode only). */
+  erpInvoiceId?: string | null;
   lines: InvoiceLine[];
 }
 

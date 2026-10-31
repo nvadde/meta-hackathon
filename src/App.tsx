@@ -10,6 +10,7 @@ import { Connections } from "@/components/Connections";
 import { Settings } from "@/components/Settings";
 import { Notifications } from "@/components/Notifications";
 import { Projects } from "@/components/Projects";
+import { Published } from "@/components/Published";
 import { Suppliers } from "@/components/Suppliers";
 import { TopBar, type ConversionEngine, type DataMode } from "@/components/TopBar";
 import { invoices as sampleInvoices, sanitizeStoredInvoices, type Invoice } from "@/data/invoices";
@@ -63,7 +64,7 @@ function store(key: string, value: unknown) {
   }
 }
 
-type DetailOrigin = "workbench" | "actions" | "suppliers" | "projects";
+type DetailOrigin = "workbench" | "actions" | "suppliers" | "projects" | "published";
 
 /** Records saved by earlier versions used the source name "Upload". */
 function migrateInvoices(records: Invoice[]): Invoice[] {
@@ -532,7 +533,8 @@ export default function App() {
     (activeId === "workbench" ||
       activeId === "actions" ||
       activeId === "suppliers" ||
-      activeId === "projects");
+      activeId === "projects" ||
+      activeId === "published");
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -604,7 +606,9 @@ export default function App() {
                     ? "Back to Suppliers"
                     : detailOrigin === "projects"
                       ? "Back to Projects"
-                      : "Back to Invoice Workbench"
+                      : detailOrigin === "published"
+                        ? "Back to Published"
+                        : "Back to Invoice Workbench"
               }
               onBack={() => setSelectedInvoiceId(null)}
               onSave={saveInvoice}
@@ -656,6 +660,11 @@ export default function App() {
               onSelectProject={setSelectedProject}
               onSelectInvoice={(invoice) => openInvoice(invoice, "projects")}
               liveSources={isLive}
+            />
+          ) : activeSection.id === "published" ? (
+            <Published
+              invoices={activeInvoices}
+              onSelectInvoice={(invoice) => openInvoice(invoice, "published")}
             />
           ) : activeSection.id === "connections" ? (
             <Connections />

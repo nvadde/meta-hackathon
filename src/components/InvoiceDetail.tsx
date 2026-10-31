@@ -740,6 +740,8 @@ export function InvoiceDetail({
             <DetailField label="Processing status" value={invoice.status} />
             <DetailField label="Invoice type" value={invoice.invoiceType ?? "Standard"} />
             <DetailField label="Exception count" value={String(invoice.exceptionCount)} />
+            <DetailField label="ERP pickup" value={invoice.queueStatus ?? "Not queued"} />
+            <DetailField label="ERP invoice" value={invoice.erpInvoiceId ?? "—"} />
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Source channel</dt>
               <dd className="mt-1">
