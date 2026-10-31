@@ -88,11 +88,6 @@ export function AppSidebar({ activeId, open, notificationCount, onSelect, onClos
           })}
         </nav>
 
-        <p className="mt-auto border-t border-white/10 px-5 py-4 text-xs leading-relaxed text-navy-muted">
-          Shell preview only.
-          <br />
-          No invoice, ERP, or database features yet.
-        </p>
       </aside>
     </>
   );
