@@ -60,7 +60,7 @@ export function InvoiceWorkbench({
             disabled={refreshing}
             className="rounded-md border border-input bg-card px-3 py-1.5 text-sm font-medium text-foreground disabled:opacity-50"
           >
-            {refreshing ? "Refreshing…" : "Refresh from Oracle"}
+            {refreshing ? "Refreshing…" : "Refresh"}
           </button>
         )}
       </div>

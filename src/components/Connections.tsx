@@ -261,10 +261,6 @@ export function Connections() {
           </p>
         )}
       </div>
-
-      <p className="mt-4 text-sm text-muted-foreground">
-        ERP posting is not connected; approved invoices only queue locally.
-      </p>
     </section>
   );
 }

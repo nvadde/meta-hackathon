@@ -57,7 +57,7 @@ describe("invoice-validation", () => {
       ),
     );
     assert.deepEqual(validationRules, onDisk);
-    assert.equal(validationRules.checks.length, 7);
+    assert.equal(validationRules.checks.length, 8);
   });
 
   it("defaults to Standard and uses Credit memo for negative totals", () => {
@@ -202,6 +202,17 @@ describe("invoice-validation", () => {
       { excludeHeaderId: 9 },
     );
     assert.equal(selfOnly.status, STATUS_MATCHED);
+  });
+
+  it("fails a fallback invoice number as not captured with a clear message", () => {
+    const result = validateInvoiceDraft(
+      { ...validDraft(), invoiceNumber: "GMAIL-47d0a597", invoiceNumberFromFallback: true },
+      masters,
+    );
+    assert.equal(result.status, STATUS_EXCEPTION);
+    assert.ok(
+      result.messages.some((message) => message.includes("GMAIL-47d0a597") && message.toLowerCase().includes("not found on the pdf")),
+    );
   });
 
   it("collects one message per failed check and counts them", () => {

@@ -57,6 +57,12 @@
       "message": "Duplicate invoice \"{value}\": the same supplier already has this invoice number on an invoice that is not Ready or Approved."
     },
     {
+      "id": "invoice-number-captured",
+      "field": "invoiceNumber",
+      "test": "capturedFromPdf",
+      "message": "Invoice number was not found on the PDF; temporary number \"{value}\" was assigned. Verify the PDF and correct it."
+    },
+    {
       "id": "lines-numeric",
       "field": "lines[].amount",
       "test": "allNumeric",

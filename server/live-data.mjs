@@ -72,10 +72,18 @@ export function invoiceTypeOf(value) {
  * masters are raw supplier_master/project_master rows. Without masters
  * the list stays empty and only the stored type is reported.
  */
+/**
+ * Synthetic invoice numbers minted when extraction missed the real one:
+ * GMAIL- plus the 8 trailing chars of the message id or timestamp.
+ * Real supplier numbers essentially never take this shape.
+ */
+const SYNTHETIC_NUMBER = /^GMAIL-[0-9a-f]{8}$/i;
+
 export function exceptionMessagesFor(row, lines, masters = null, opts = {}) {
   if (!masters) return [];
   const draft = {
     invoiceNumber: row.INVOICE_NUMBER ?? "",
+    invoiceNumberFromFallback: SYNTHETIC_NUMBER.test(String(row.INVOICE_NUMBER ?? "")),
     vendorName: row.SUPPLIER_NAME ?? row.VENDOR_NAME ?? "",
     supplierNumber: row.SUPPLIER_NUMBER ?? "",
     amountDue: row.AMOUNT_DUE,

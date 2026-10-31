@@ -117,7 +117,7 @@ export async function convertWithEngine(
 export function agentDataToManualFields(data) {
   const first = (data.Items ?? data.items ?? data["lineitem.Items"] ?? [])[0] || {};
   return {
-    invoiceNumber: data.InvoiceId ?? data.invoice_number ?? "",
+    invoiceNumber: data.InvoiceNumber ?? data.InvoiceId ?? data.invoice_number ?? "",
     supplier: data.VendorName ?? data.vendor_name ?? "",
     amount: data.AmountDue ?? data.InvoiceTotal ?? data.amount_due ?? 0,
     currency: data.Currency ?? data.currency ?? "USD",

@@ -142,5 +142,16 @@
     "status": "A",
     "invoice_id": "inv-1016",
     "invoice_number": "INV-7700"
+  },
+  {
+    "file_id": 17,
+    "file_name": "manual-1793374078604-844781.pdf",
+    "file_path": "files/Manual/manual-1793374078604-844781.pdf",
+    "message_id": null,
+    "status": "A",
+    "invoice_id": null,
+    "invoice_number": null,
+    "original_file_name": "844781.pdf",
+    "source": "Manual Upload"
   }
 ]

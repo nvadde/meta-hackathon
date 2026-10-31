@@ -1,18 +1,21 @@
 {
   "channel": "Gmail",
   "originalName": "844707.pdf",
-  "storedName": "gmail-1793327337845-844707.pdf",
-  "filePath": "files/Gmail/gmail-1793327337845-844707.pdf",
-  "fileId": 7,
-  "headerId": 7,
-  "messageId": "1a18aa3247d0a597",
+  "storedName": "gmail-1793393828420-844707.pdf",
+  "filePath": "files/Gmail/gmail-1793393828420-844707.pdf",
+  "fileId": 4,
+  "headerId": 4,
+  "messageId": "1a18e99fcb47544c",
   "invoiceType": "Standard",
-  "processingStatus": "Matched",
-  "exceptionCount": 0,
-  "exceptionMessages": [],
-  "convertedAt": "2026-10-30T02:29:42.053Z",
+  "processingStatus": "Exception",
+  "exceptionCount": 1,
+  "exceptionMessages": [
+    "Duplicate invoice \"844707\": the same supplier already has this invoice number on an invoice that is not Ready or Approved."
+  ],
+  "convertedAt": "2026-10-30T20:57:44.009Z",
   "draft": {
-    "invoiceNumber": "GMAIL-47d0a597",
+    "invoiceNumber": "844707",
+    "invoiceNumberFromFallback": false,
     "vendorName": "KATH FUEL OIL SERVICE CO",
     "invoiceDate": "2026-01-22",
     "dueDate": "2026-02-15",
@@ -27,16 +30,16 @@
     "previousUnpaidBalance": null,
     "totalTax": 66.09,
     "totalVat": 0,
-    "billingAddress": "BOX 1333 MINNEAPOLIS, MN 20841-1333",
+    "billingAddress": "BOX 1333, MINNEAPOLIS, MN 20841-1333",
     "billingAddressRecipient": "SRIE CO, M A",
-    "customerAddress": "BOX 1333 MINNEAPOLIS, MN 20841-1333",
+    "customerAddress": "BOX 1333, MINNEAPOLIS, MN 20841-1333",
     "customerAddressRecipient": "SRIE CO, M A",
     "remittanceAddress": "",
     "remittanceAddressRecipient": "",
-    "shippingAddress": "WAYNE 651-248-9351 ABBOTT NORTHWESTERN 800 E. 28TH ST MPLS, MN",
+    "shippingAddress": "ABBOTT NORTHWESTERN, 800 E. 28TH ST, MPLS, MN",
     "shippingAddressRecipient": "SRIE CO, M A",
     "shippingCost": null,
-    "vendorAddress": "3096 RICE ST LITTLE CANADA, MN 55113",
+    "vendorAddress": "3096 RICE ST, LITTLE CANADA, MN 55113",
     "notes": "",
     "purchaseOrder": "",
     "lines": [
@@ -131,6 +134,6 @@
         "amount": 1.79
       }
     ],
-    "lowConfidence": true
+    "lowConfidence": false
   }
 }

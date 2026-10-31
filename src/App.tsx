@@ -7,6 +7,7 @@ import { InvoiceWorkbench } from "@/components/InvoiceWorkbench";
 import { MyActions } from "@/components/MyActions";
 import { Overview } from "@/components/Overview";
 import { Connections } from "@/components/Connections";
+import { Settings } from "@/components/Settings";
 import { Notifications } from "@/components/Notifications";
 import { Projects } from "@/components/Projects";
 import { Suppliers } from "@/components/Suppliers";
@@ -664,6 +665,8 @@ export default function App() {
               onMarkAllRead={markAllNotificationsRead}
               onOpenInvoice={openNotificationInvoice}
             />
+          ) : activeSection.id === "settings" ? (
+            <Settings />
           ) : (
             <EmptyState section={activeSection} />
           )}

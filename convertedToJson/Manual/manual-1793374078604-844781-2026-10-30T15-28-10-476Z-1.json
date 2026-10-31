@@ -1,0 +1,53 @@
+{
+  "channel": "Manual Upload",
+  "originalName": "manual-1793374078604-844781.pdf",
+  "storedName": "manual-1793374078604-844781.pdf",
+  "filePath": "files/Manual/manual-1793374078604-844781.pdf",
+  "fileId": 1,
+  "headerId": 1,
+  "messageId": null,
+  "invoiceType": "Standard",
+  "processingStatus": "Matched",
+  "exceptionCount": 0,
+  "exceptionMessages": [],
+  "convertedAt": "2026-10-30T15:28:10.476Z",
+  "draft": {
+    "invoiceNumber": "844781",
+    "vendorName": "KATH FUEL OIL SERVICE CO",
+    "invoiceDate": "2026-10-30",
+    "dueDate": "",
+    "amountDue": 1825.13,
+    "currency": "USD",
+    "projectNumber": "23120003",
+    "jobNumber": "",
+    "paymentTerms": "",
+    "previousUnpaidBalance": null,
+    "totalTax": 0,
+    "totalVat": 0,
+    "billingAddress": "",
+    "billingAddressRecipient": "",
+    "customerAddress": "",
+    "customerAddressRecipient": "",
+    "remittanceAddress": "",
+    "remittanceAddressRecipient": "",
+    "shippingAddress": "",
+    "shippingAddressRecipient": "",
+    "shippingCost": null,
+    "vendorAddress": "",
+    "notes": "",
+    "purchaseOrder": "",
+    "lines": [
+      {
+        "lineNum": "1",
+        "name": "",
+        "productCode": "",
+        "description": "Test",
+        "quantity": 1,
+        "units": "ea",
+        "unitPrice": 1825.13,
+        "amount": 1825.13
+      }
+    ],
+    "lowConfidence": false
+  }
+}

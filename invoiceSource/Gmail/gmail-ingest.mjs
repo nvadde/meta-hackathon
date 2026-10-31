@@ -82,22 +82,26 @@ function str(value, max = 300) {
  * draft matching Tables.sql. Also accepts the plain-key schema shape.
  */
 export function parseMuseInvoice(data = {}, fallback = {}) {
-  const rawLines = pick(data, "lineitem.Items", "lines", "items");
+  const rawLines = pick(data, "lineitem.Items", "Items", "lines", "items");
   const lines = Array.isArray(rawLines)
     ? rawLines.slice(0, 50).map((line, index) => ({
-        lineNum: str(pick(line, "lineitem.LineNum", "line_num", "lineNum") ?? index + 1, 30),
-        name: str(pick(line, "lineitem.Name", "name") ?? ""),
-        productCode: str(pick(line, "lineitem.ProductCode", "product_code", "productCode") ?? ""),
-        description: str(pick(line, "lineitem.Description", "description") ?? ""),
-        quantity: num(pick(line, "lineitem.Quantity", "quantity")),
-        units: str(pick(line, "lineitem.Unit", "units") ?? "ea", 30),
-        unitPrice: num(pick(line, "lineitem.UnitPrice", "unit_price", "unitPrice")),
-        amount: num(pick(line, "lineitem.Amount", "amount")),
+        lineNum: str(pick(line, "LineNum", "lineitem.LineNum", "line_num", "lineNum") ?? index + 1, 30),
+        name: str(pick(line, "Name", "lineitem.Name", "name") ?? ""),
+        productCode: str(pick(line, "ProductCode", "lineitem.ProductCode", "product_code", "productCode") ?? ""),
+        description: str(pick(line, "Description", "lineitem.Description", "description") ?? ""),
+        quantity: num(pick(line, "Quantity", "lineitem.Quantity", "quantity")),
+        units: str(pick(line, "Unit", "lineitem.Unit", "units") ?? "ea", 30),
+        unitPrice: num(pick(line, "UnitPrice", "lineitem.UnitPrice", "unit_price", "unitPrice")),
+        amount: num(pick(line, "Amount", "lineitem.Amount", "amount")),
       }))
     : [];
+  const capturedNumber = str(
+    pick(data, "InvoiceNumber", "InvoiceId", "invoice_number", "invoiceNumber") || fallback.invoiceNumber || "",
+    30,
+  );
+  const invoiceNumberFromFallback = !capturedNumber;
   const invoiceNumber =
-    str(pick(data, "InvoiceId", "invoice_number", "invoiceNumber") || fallback.invoiceNumber || "", 30) ||
-    `GMAIL-${String(fallback.messageId || Date.now()).slice(-8)}`;
+    capturedNumber || `GMAIL-${String(fallback.messageId || Date.now()).slice(-8)}`;
   const vendorName = str(
     pick(data, "VendorName", "vendor_name", "vendorName") || fallback.vendorName || "Unknown vendor",
   );
@@ -108,13 +112,14 @@ export function parseMuseInvoice(data = {}, fallback = {}) {
   const amountDue = Number.isFinite(parsedAmount) ? parsedAmount : 0;
   const currency = pick(data, "Currency", "currency");
   const lowConfidence =
-    !pick(data, "InvoiceId", "invoice_number", "invoiceNumber") ||
+    !pick(data, "InvoiceNumber", "InvoiceId", "invoice_number", "invoiceNumber") ||
     !pick(data, "VendorName", "vendor_name", "vendorName") ||
     !amountValid;
   const notes = str(pick(data, "Notes", "notes") ?? "", 500);
   const purchaseOrder = str(pick(data, "PurchaseOrder", "purchase_order", "purchaseOrder") ?? "", 30);
   return {
     invoiceNumber,
+    invoiceNumberFromFallback,
     vendorName,
     invoiceDate: toIsoDate(pick(data, "InvoiceDate", "invoice_date", "invoiceDate")) || toIsoDate(fallback.date),
     dueDate: toIsoDate(pick(data, "DueDate", "due_date", "dueDate")),

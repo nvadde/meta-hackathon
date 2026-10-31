@@ -1,0 +1,129 @@
+{
+  "channel": "Gmail",
+  "originalName": "844708.pdf",
+  "storedName": "gmail-1793395086107-844708.pdf",
+  "filePath": "files/Gmail/gmail-1793395086107-844708.pdf",
+  "fileId": 6,
+  "headerId": 6,
+  "messageId": "1a18eabe3868c050",
+  "invoiceType": "Standard",
+  "processingStatus": "Exception",
+  "exceptionCount": 1,
+  "exceptionMessages": [
+    "Duplicate invoice \"844708\": the same supplier already has this invoice number on an invoice that is not Ready or Approved."
+  ],
+  "convertedAt": "2026-10-30T21:18:43.128Z",
+  "draft": {
+    "invoiceNumber": "844708",
+    "invoiceNumberFromFallback": false,
+    "vendorName": "KATH FUEL OIL SERVICE CO",
+    "invoiceDate": "2026-01-22",
+    "dueDate": "2026-02-15",
+    "amountDue": 2640.1,
+    "currency": "USD",
+    "projectNumber": "",
+    "projectName": "",
+    "supplierNumber": "",
+    "amountInvalid": false,
+    "jobNumber": "JOB# 23120003",
+    "paymentTerms": "15TH OF FOLLOWING MO",
+    "previousUnpaidBalance": null,
+    "totalTax": 203.12,
+    "totalVat": 0,
+    "billingAddress": "BOX 1333, MD 2087-1333",
+    "billingAddressRecipient": "SIRE CO, MD",
+    "customerAddress": "BOX 1333, MD 2087-1333",
+    "customerAddressRecipient": "SIRE CO, MD",
+    "remittanceAddress": "",
+    "remittanceAddressRecipient": "",
+    "shippingAddress": "3000 145 TH STREET E, W OF ADDRESS, ROSEMOUNT, MN 55068",
+    "shippingAddressRecipient": "SIRE, MAIN",
+    "shippingCost": null,
+    "vendorAddress": "3096 RICE ST, LITTLE CANADA, MN 55113",
+    "notes": " PO:JOB# 23120003",
+    "purchaseOrder": "JOB# 23120003",
+    "lines": [
+      {
+        "lineNum": "1",
+        "name": "ULTRA LOW #1 DYED",
+        "productCode": "913",
+        "description": "## 15-ppm sulfur Dyed ULSD. Non-road or tax ## exempt use only. ULTRA LOW #1 DYED",
+        "quantity": 670.1,
+        "units": "GAL",
+        "unitPrice": 3.636,
+        "amount": 2436.48
+      },
+      {
+        "lineNum": "2",
+        "name": "MN INSP FEE&FED ENVO .0029",
+        "productCode": "",
+        "description": "MN INSP FEE&FED ENVO .0029",
+        "quantity": 670.1,
+        "units": "",
+        "unitPrice": 0.0067,
+        "amount": 4.49
+      },
+      {
+        "lineNum": "3",
+        "name": "MN STATE SALES TAX 6.875%",
+        "productCode": "",
+        "description": "MN STATE SALES TAX 6.875%",
+        "quantity": 0,
+        "units": "",
+        "unitPrice": 6.875,
+        "amount": 167.51
+      },
+      {
+        "lineNum": "4",
+        "name": "FED LUST TAX $.001",
+        "productCode": "",
+        "description": "FED LUST TAX $.001",
+        "quantity": 670.1,
+        "units": "",
+        "unitPrice": 0.001,
+        "amount": 0.67
+      },
+      {
+        "lineNum": "5",
+        "name": "MN TRANS IMPV TAX DAKOTA CO",
+        "productCode": "",
+        "description": "MN TRANS IMPV TAX DAKOTA CO",
+        "quantity": 0,
+        "units": "",
+        "unitPrice": 0.25,
+        "amount": 6.09
+      },
+      {
+        "lineNum": "6",
+        "name": ".75% METRO TRANSPORT TX",
+        "productCode": "",
+        "description": ".75% METRO TRANSPORT TX",
+        "quantity": 0,
+        "units": "",
+        "unitPrice": 0.75,
+        "amount": 18.27
+      },
+      {
+        "lineNum": "7",
+        "name": ".25% METRO HOUSING TX",
+        "productCode": "",
+        "description": ".25% METRO HOUSING TX",
+        "quantity": 0,
+        "units": "",
+        "unitPrice": 0.25,
+        "amount": 6.09
+      },
+      {
+        "lineNum": "8",
+        "name": "MN ROAD IMPRV DELV FEE",
+        "productCode": "",
+        "description": "MN ROAD IMPRV DELV FEE",
+        "quantity": 0,
+        "units": "",
+        "unitPrice": 50,
+        "amount": 0.5
+      }
+    ],
+    "lowConfidence": false
+  }
+}

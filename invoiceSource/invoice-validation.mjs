@@ -32,6 +32,7 @@ const FALLBACK_RULES = {
     { id: "amount-valid", message: "Amount due is not a valid non-zero number." },
     { id: "supplier-match", message: "Supplier \"{value}\" does not match any supplier name or number in the ERP feed." },
     { id: "duplicate-invoice", message: "Duplicate invoice \"{value}\": the same supplier already has this invoice number on an invoice that is not Ready or Approved." },
+    { id: "invoice-number-captured", message: "Invoice number was not found on the PDF; temporary number \"{value}\" was assigned. Verify the PDF and correct it." },
     { id: "project-match", message: "Project \"{value}\" does not match any project name or number in the ERP feed.", blankMessage: "Project is blank: no project name or number to match against the ERP feed." },
     { id: "lines-numeric", message: "A line amount is not numeric." },
     { id: "lines-reconcile", message: "Invoice header amount {header} does not match the lines total {lines}." },
@@ -123,6 +124,9 @@ export function validateInvoiceDraft(draft = {}, masters = {}, opts = {}) {
     String(template ?? "").replace(/\{(\w+)\}/g, (_, key) => values[key] ?? `{${key}}`);
 
   if (!invoiceNumber) messages.push(messagesFor("invoice-number-present").message);
+  if (invoiceNumber && draft.invoiceNumberFromFallback) {
+    messages.push(fill(messagesFor("invoice-number-captured").message, { value: invoiceNumber }));
+  }
   if (!vendorName) messages.push(messagesFor("supplier-present").message);
   if (draft.amountInvalid || amount === null || amount === 0) {
     messages.push(messagesFor("amount-valid").message);

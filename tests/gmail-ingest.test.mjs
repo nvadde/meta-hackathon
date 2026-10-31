@@ -53,6 +53,36 @@ describe("gmail-ingest", () => {
     assert.match(draft.invoiceNumber, /GMAIL-/);
   });
 
+  it("keeps the InvoiceNumber key from the knowledge schema instead of a GMAIL- fallback", () => {
+    const draft = parseMuseInvoice(
+      { InvoiceNumber: "844707", VendorName: "Acme", AmountDue: 100, Currency: "USD" },
+      { messageId: "m1" },
+    );
+    assert.equal(draft.invoiceNumber, "844707");
+    assert.equal(draft.invoiceNumberFromFallback, false);
+    assert.equal(draft.lowConfidence, false);
+  });
+
+  it("keeps capitalized line-item keys from the knowledge schema", () => {
+    const draft = parseMuseInvoice(
+      {
+        InvoiceNumber: "844707",
+        VendorName: "Acme",
+        AmountDue: 780.49,
+        Currency: "USD",
+        "lineitem.Items": [
+          { LineNum: "1", Name: "ULTRA LOW #1 DYED", Quantity: 670.1, Unit: "GAL", UnitPrice: 3.636, Amount: 2436.48, Description: "Dyed ULSD" },
+        ],
+      },
+      {},
+    );
+    assert.equal(draft.lines.length, 1);
+    assert.equal(draft.lines[0].description, "Dyed ULSD");
+    assert.equal(draft.lines[0].quantity, 670.1);
+    assert.equal(draft.lines[0].unitPrice, 3.636);
+    assert.equal(draft.lines[0].amount, 2436.48);
+  });
+
   it("empties unparseable model dates so Oracle never sees Invalid Date", () => {
     const draft = parseLlamaInvoice(
       '{"invoice_number":"INV-1","vendor_name":"Acme","invoice_date":"sometime soon","amount_due":5,"currency":"USD","project_number":"","notes":""}',
