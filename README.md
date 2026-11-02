@@ -21,6 +21,7 @@ SIRE; they stay in the ERP.
 ![SIRE high-level flow] (docs/SIRE-high-level-flow.jpg)
 
 Demo video: https://youtu.be/vVIYS_aX4So
+Github: https://github.com/nvadde/meta-hackathon
 
 ## Run
 
