@@ -18,9 +18,9 @@ through a REST API (see Consumer API below) and writes back its status — no ER
 SIRE, which keeps it platform-independent, and banking details never enter
 SIRE; they stay in the ERP.
 
-![SIRE high-level flow](SIRE-high-level-flow-corrected.jpg)
+![SIRE high-level flow] (docs/SIRE-high-level-flow.jpg)
 
-Demo video: https://youtu.be/gtz-5Rs_lR0.
+Demo video: https://youtu.be/VI1kiez12hM
 
 ## Run
 
