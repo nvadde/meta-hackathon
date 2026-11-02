@@ -20,7 +20,7 @@ SIRE; they stay in the ERP.
 
 ![SIRE high-level flow] (docs/SIRE-high-level-flow.jpg)
 
-Demo video: https://youtu.be/VI1kiez12hM
+Demo video: https://youtu.be/vVIYS_aX4So
 
 ## Run
 
@@ -231,9 +231,9 @@ records.
 3. **Create the invoice in your ERP.** Your side, your invoice number.
 4. **Write back the status.**
    ```bash
-   curl -X PUT -H "Authorization: Bearer <access_token>" \
+   curl -X PATCH -H "Authorization: Bearer <access_token>" \
      -H "Content-Type: application/json" \
-     -d '{"_id": <id>, "processed_status": "CREATED"}' \
+     -d '{"processed_status": "CREATED"}' \
      "{base}/ords/hack/invoices/<id>"
    ```
    The write-back is persisted in `invoice_header` (verified: the record
