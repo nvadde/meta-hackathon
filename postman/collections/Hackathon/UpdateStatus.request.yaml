@@ -1,0 +1,15 @@
+$kind: http-request
+url: "{{base_url}}/hack/invoices"
+method: PUT
+body:
+  type: formdata
+  content:
+    - type: text
+      key: status
+      value: APPROVED
+      disabled: false
+auth:
+  type: bearer
+  credentials:
+    token: "{{accessToken}}"
+order: 3000

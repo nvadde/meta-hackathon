@@ -61,16 +61,11 @@ export async function claimForErp(connection, headerId, { consumer = "", created
     `UPDATE erp_invoice_queue
         SET queue_status = 'PROCESSING',
             attempt_count = NVL(attempt_count, 0) + 1,
-            erp_system = CASE WHEN :consumer = '' THEN erp_system ELSE :consumer END,
-            updated_date = :now,
-            updated_by = :by
-      WHERE header_id = :headerId AND queue_status = 'QUEUED'`,
-    {
-      consumer: clean(consumer),
-      now: new Date(),
-      by: createdBy,
-      headerId,
-    },
+            erp_system = CASE WHEN :0 = '' THEN erp_system ELSE :1 END,
+            updated_date = :2,
+            updated_by = :3
+      WHERE header_id = :4 AND queue_status = 'QUEUED'`,
+    [clean(consumer), clean(consumer), new Date(), createdBy, headerId],
     { autoCommit: false },
   );
   if ((result.rowsAffected ?? 0) !== 1) {
@@ -102,23 +97,17 @@ export async function writeBackErp(
   if (verb === "CREATED" && !reference) {
     throw new Error("writeBackErp: erpInvoiceId is required when outcome is 'CREATED'.");
   }
+  const verbCreated = verb === "CREATED" ? 1 : 0;
   const result = await connection.execute(
     `UPDATE erp_invoice_queue
-        SET queue_status = :status,
-            erp_invoice_id = CASE WHEN :status = 'CREATED' THEN :reference ELSE erp_invoice_id END,
-            last_error = CASE WHEN :status = 'FAILED' THEN :reason ELSE NULL END,
-            processed_date = :now,
-            updated_date = :now,
-            updated_by = :by
-      WHERE header_id = :headerId AND queue_status = 'PROCESSING'`,
-    {
-      status: verb,
-      reference: reference || null,
-      reason: clean(reason) || null,
-      now: new Date(),
-      by: createdBy,
-      headerId,
-    },
+        SET queue_status = :0,
+            erp_invoice_id = CASE WHEN :1 = 1 THEN :2 ELSE erp_invoice_id END,
+            last_error = CASE WHEN :1 = 1 THEN NULL ELSE :3 END,
+            processed_date = :4,
+            updated_date = :5,
+            updated_by = :6
+      WHERE header_id = :7 AND queue_status = 'PROCESSING'`,
+    [verb, verbCreated, reference || null, clean(reason) || null, new Date(), new Date(), createdBy, headerId],
     { autoCommit: false },
   );
   if ((result.rowsAffected ?? 0) !== 1) {

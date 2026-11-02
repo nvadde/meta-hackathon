@@ -1,0 +1,8 @@
+workspace:
+  id: dbd984f1-ad8e-4456-876b-f7a2fb6d0bbc
+
+# Each entry here maps a local resource to one or more corresponding objects in Postman Cloud
+
+cloudResources:
+  collections:
+    ../postman/collections/Hackathon: 22655890-290d74ca-20de-4bbd-9c88-574c00d6544e

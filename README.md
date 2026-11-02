@@ -14,13 +14,13 @@ extracts them into a strict JSON schema, deterministic validation checks
 supplier, project, duplicates, and math, a human reviewer verifies the PDF
 against the extracted data and approves or rejects with remarks, and approved
 invoices are published to database tables. Any ERP picks up approved invoices
-from those tables and writes back its status — no ERP is configured inside
+through a REST API (see Consumer API below) and writes back its status — no ERP is configured inside
 SIRE, which keeps it platform-independent, and banking details never enter
 SIRE; they stay in the ERP.
 
 ![SIRE high-level flow](SIRE-high-level-flow-corrected.jpg)
 
-Demo video: _link to be added once uploaded_.
+Demo video: https://youtu.be/gtz-5Rs_lR0.
 
 ## Run
 
@@ -207,6 +207,44 @@ records.
   pickup only. Nothing is sent to an ERP and no ERP invoice is created by
   SIRE; a consuming ERP picks up approved invoices and writes back its
   status.
+
+## Consumer API (ERP pickup)
+
+- No ERP is configured inside SIRE and there are no per-ERP endpoints: any
+  consumer integrates through one generic REST API, served by Oracle REST
+  Data Services on the Oracle Autonomous Database.
+- **Auth:** OAuth Bearer token — obtain a token from the OAuth token
+  endpoint and send it as `Authorization: Bearer <token>` on every call.
+
+### For consumers — step by step
+
+1. **Get an access token.** Use the client credentials issued to you for
+   your application (see the `POST OAuth` request in the shared Postman
+   collection for the exact call). The response contains the access token.
+2. **Read approved invoices.** Only approved, published invoices appear
+   here.
+   ```bash
+   curl -H "Authorization: Bearer <access_token>" \
+     "{base}/ords/hack/approved-invoices/"
+   ```
+   Use the trailing slash: the URL without it redirects.
+3. **Create the invoice in your ERP.** Your side, your invoice number.
+4. **Write back the status.**
+   ```bash
+   curl -X PUT -H "Authorization: Bearer <access_token>" \
+     -H "Content-Type: application/json" \
+     -d '{"_id": <id>, "processed_status": "CREATED"}' \
+     "{base}/ords/hack/invoices/<id>"
+   ```
+   The write-back is persisted in `invoice_header` (verified: the record
+   reads back with status CREATED). Note the field-name difference: the
+   write field is `processed_status`; the stored field reads back as
+   `processing_status`.
+- The pickup and CREATED write-back are demonstrated with a simulated
+  consumer and the endpoints above.
+- **Credentials:** each consumer gets its own client id and secret from
+  the SIRE admin. Never commit real credentials, tokens, or wallet files
+  to the repo — the examples above use placeholders only.
 
 ## Live sources
 

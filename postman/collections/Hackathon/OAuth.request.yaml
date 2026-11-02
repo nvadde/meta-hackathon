@@ -1,0 +1,23 @@
+$kind: http-request
+url: https://gccfc76edf3f0bf-ydqptuh78qg6ler4.adb.us-ashburn-1.oraclecloudapps.com/ords/hack/oauth/token
+method: POST
+body:
+  type: urlencoded
+  content:
+    grant_type: client_credentials
+auth:
+  type: basic
+  credentials:
+    username: 7TgjOLf5R13wSzsFb-bhaQ..
+    password: 2Y82RRgatlLyHbIK8QLJvA..
+scripts:
+  - type: afterResponse
+    code: "pm.test(\"Status test\", function () {\r
+
+      \   let responseData = pm.response.json();\r
+
+      \   pm.collectionVariables.set(\"accessToken\", responseData.access_token);\r
+
+      });"
+    language: text/javascript
+order: 1000

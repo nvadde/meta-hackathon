@@ -67,9 +67,9 @@ test("writeBackErp records FAILED with the reason", async () => {
   const result = await writeBackErp(connection, 7, { outcome: "FAILED", reason: "Bad supplier site" });
   assert.equal(result.status, "failed");
   const update = connection.seen[0];
-  assert.match(update.sql, /queue_status = :status/);
-  assert.equal(update.binds.status, "FAILED");
-  assert.equal(update.binds.reason, "Bad supplier site");
+  assert.match(update.sql, /queue_status = :0/);
+  assert.equal(update.binds[0], "FAILED");
+  assert.equal(update.binds[3], "Bad supplier site");
 });
 
 test("writeBackErp rejects bad outcomes, missing references, and unclaimed rows", async () => {
