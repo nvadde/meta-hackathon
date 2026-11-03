@@ -20,7 +20,7 @@ SIRE; they stay in the ERP.
 
 ![SIRE high-level flow] (docs/SIRE-high-level-flow.jpg)
 
-Demo video: https://youtu.be/vVIYS_aX4So
+Demo video: https://youtu.be/L8rqOXZSiPo
 Github: https://github.com/nvadde/meta-hackathon
 
 ## Run
