@@ -23,7 +23,18 @@ export type ProcessingStatus =
   | "Exception"
   | "Ready"
   | "Approved"
-  | "Rejected";
+  | "Rejected"
+  | "CREATED"
+  | "FAILED";
+
+export const PROCESSING_STATUS_LABELS: Record<string, string> = {
+  CREATED: "Created in ERP",
+  FAILED: "ERP creation failed",
+};
+
+export function processingStatusLabel(status: string): string {
+  return PROCESSING_STATUS_LABELS[status] ?? status;
+}
 
 /** Processing status list of values (LOV) used by filters and the detail screen. */
 export const processingStatuses: ProcessingStatus[] = [

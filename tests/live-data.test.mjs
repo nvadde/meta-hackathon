@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  isRecognizedStatus,
   mapInvoiceRows,
   mapProjectRow,
   mapSupplierRow,
   normalizeSource,
+  processingStatusLabel,
 } from "../server/live-data.mjs";
 
 test("mapSupplierRow and mapProjectRow shape Oracle rows like the ERP feeds", () => {
@@ -108,6 +110,26 @@ test("mapInvoiceRows reports the stored invoice type and re-derives exception me
   assert.ok(broken.exceptionMessages.includes("Invoice number is blank."));
   assert.ok(broken.exceptionMessages.some((message) => message.includes("Ghost Ltd")));
   assert.ok(!broken.exceptionMessages.some((message) => message.includes("PRJ-999")));
+});
+
+test("mapInvoiceRows keeps CREATED/FAILED raw and labels them, without falling back to Received", () => {
+  const [created, failed, mystery] = mapInvoiceRows(
+    [
+      { HEADER_ID: 11, PROCESSING_STATUS: "CREATED" },
+      { HEADER_ID: 12, PROCESSING_STATUS: "FAILED" },
+      { HEADER_ID: 13, PROCESSING_STATUS: "SOME_FUTURE_STATE" },
+    ],
+    [],
+  );
+  assert.equal(created.status, "CREATED");
+  assert.equal(failed.status, "FAILED");
+  assert.equal(mystery.status, "SOME_FUTURE_STATE");
+  assert.equal(processingStatusLabel(created.status), "Created in ERP");
+  assert.equal(processingStatusLabel(failed.status), "ERP creation failed");
+  assert.equal(processingStatusLabel(mystery.status), "SOME_FUTURE_STATE");
+  assert.equal(isRecognizedStatus("CREATED"), true);
+  assert.equal(isRecognizedStatus("FAILED"), true);
+  assert.equal(isRecognizedStatus("Received"), true);
 });
 
 test("mapInvoiceRows groups lines under headers and carries the file path", () => {

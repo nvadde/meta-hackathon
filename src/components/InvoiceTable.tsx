@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   invoiceSources,
+  processingStatusLabel,
   processingStatuses,
   type Invoice,
   type InvoiceSource,
@@ -48,6 +49,8 @@ const statusStyles: Record<ProcessingStatus, string> = {
   Ready: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
   Approved: "border-teal bg-teal text-white dark:border-teal dark:bg-teal dark:text-white",
   Rejected: "border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-900 dark:text-red-100",
+  CREATED: "border-teal/40 bg-teal-soft text-teal-dark dark:bg-teal/20 dark:text-teal",
+  FAILED: "border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-900 dark:text-red-100",
 };
 
 const selectClassName =
@@ -415,7 +418,7 @@ export function InvoiceTable({
                     )}
                     <td className="whitespace-nowrap px-3 py-2.5">
                       <Badge variant="outline" className={statusStyles[invoice.status]}>
-                        {invoice.status}
+                        {processingStatusLabel(invoice.status)}
                       </Badge>
                     </td>
                     <td className="max-w-[220px] truncate px-3 py-2.5" title={invoice.remittanceAddress}>

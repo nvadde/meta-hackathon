@@ -61,7 +61,23 @@ const KNOWN_STATUSES = new Set([
   "Ready",
   "Approved",
   "Rejected",
+  "CREATED",
+  "FAILED",
 ]);
+
+export const PROCESSING_STATUS_LABELS = {
+  CREATED: "Created in ERP",
+  FAILED: "ERP creation failed",
+};
+
+export function processingStatusLabel(status) {
+  const raw = String(status ?? "");
+  return PROCESSING_STATUS_LABELS[raw] ?? raw;
+}
+
+export function isRecognizedStatus(status) {
+  return KNOWN_STATUSES.has(String(status ?? ""));
+}
 
 export function invoiceTypeOf(value) {
   return String(value ?? "").trim().toLowerCase() === "credit memo" ? "Credit memo" : "Standard";
@@ -153,7 +169,7 @@ export function mapInvoiceRows(headerRows, lineRows, masters = null, queueByHead
       invoiceDate: toIsoDate(row.INVOICE_DATE),
       amount: Number(row.AMOUNT_DUE ?? 0),
       currency: row.INVOICE_CURRENCY ?? "USD",
-      status: KNOWN_STATUSES.has(row.PROCESSING_STATUS) ? row.PROCESSING_STATUS : "Received",
+      status: row.PROCESSING_STATUS ? String(row.PROCESSING_STATUS) : "Received",
       invoiceType: invoiceTypeOf(row.INVOICE_TYPE),
       remittanceAddress: row.REMITTANCE_ADDRESS ?? "",
       billToAddress: row.BILL_TO ?? row.CUSTOMER_ADDRESS ?? "",
