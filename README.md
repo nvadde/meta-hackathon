@@ -233,8 +233,8 @@ records.
 4. **Write back the status.**
    ```bash
    curl -X PATCH -H "Authorization: Bearer <access_token>" \
-     -H "Content-Type: application/json" \
-     -d '{"processed_status": "CREATED"}' \
+     -H "Content-Type: application/merge-patch+json" \
+     -d '{"processing_status": "CREATED"}' \
      "{base}/ords/hack/invoices/<id>"
    ```
    The write-back is persisted in `invoice_header` (verified: the record
