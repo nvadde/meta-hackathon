@@ -13,10 +13,20 @@ invoices arrive from Gmail or manual upload, a ReAct agent (Muse Spark)
 extracts them into a strict JSON schema, deterministic validation checks
 supplier, project, duplicates, and math, a human reviewer verifies the PDF
 against the extracted data and approves or rejects with remarks, and approved
-invoices are published to database tables. Any ERP picks up approved invoices
-through a REST API (see Consumer API below) and writes back its status — no ERP is configured inside
-SIRE, which keeps it platform-independent, and banking details never enter
-SIRE; they stay in the ERP.
+invoices are published to database tables. 
+
+To seamlessly integrate with your existing tech stack, the SIRE REST API 
+secured by OAuth is shared with customers to provide direct, secure, and 
+reliable access to the engine — allowing any ERP to simply read the invoice 
+data and write its status back once the invoice is created in the ERP. 
+No ERP is configured inside SIRE, which keeps it platform-independent, and 
+banking details never enter SIRE; they stay in the ERP.
+
+In the video, the consumer is demonstrated with Postman as a stand-in for any ERP:
+
+GetInvoices: GET https://<url>/hack/approved-invoices/
+UpdateStatus: PATCH https://<url>/hack/invoices/<invoiceid> with body {"processing_status": "CREATED"}
+
 
 ![SIRE high-level flow] (docs/SIRE-high-level-flow.jpg)
 
