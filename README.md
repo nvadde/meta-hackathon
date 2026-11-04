@@ -4,6 +4,10 @@ React, TypeScript, Vite, Tailwind CSS, shadcn/ui, and Lucide icons, with
 Oracle Autonomous Database (node-oracledb) and a Muse Spark ReAct extraction
 pipeline.
 
+Construction is the proof case, the product is AP automation for any large business. 
+Ingest, extraction, validation, human review, duplicate exception, consumer API call, 
+database write-back, dashboard badge — all running on a real backend, nothing simulated
+
 ## What SIRE is
 
 SIRE stops late supplier payments from freezing job sites. Payables teams
