@@ -4,9 +4,22 @@ React, TypeScript, Vite, Tailwind CSS, shadcn/ui, and Lucide icons, with
 Oracle Autonomous Database (node-oracledb) and a Muse Spark ReAct extraction
 pipeline.
 
-Construction is the proof case, the product is AP automation for any large business. 
-Ingest, extraction, validation, human review, duplicate exception, consumer API call, 
-database write-back, dashboard badge — all running on a real backend, nothing simulated
+## Why it matters
+
+ERP OCR and document understanding read an invoice; they don't decide whether 
+it should be paid. SIRE closes that gap: deterministic validation, duplicate blocking, 
+a human approval gate with audit remarks, and a platform-independent handoff 
+any ERP can pull from — with banking details never entering SIRE.
+
+Construction is the proof case, but the need is horizontal: any large business 
+running payables faces the same cost — late payments that freeze work, strained 
+supplier relations, and payables staff time spent re-typing and cross-checking. 
+SIRE cuts that cost and keeps payments on time, with no slippages.
+
+Demonstrated on demo data: duplicate invoice 844707 caught and rejected, 
+so $780.49 was not paid twice; 9 invoices live in the workbench, with the consumer 
+write-back verified end to end.
+
 
 ## What SIRE is
 
